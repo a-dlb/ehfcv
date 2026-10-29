@@ -6,7 +6,7 @@ Created on Thu Oct 29 13:32:41 2026
 @author: antoinedlbck
 """
 
-from constants import G, INCH_TO_M, GEAR_PAIR_EFF
+from constants import G, INCH_TO_M, GEAR_PAIR_EFF, RPM_TO_RADS
 from dataclasses import dataclass
 
 # Dataclass for the vehicle, with frozen=True so it can't be changed
@@ -24,6 +24,10 @@ class Vehicle:
     tire_rimsize: float = 19                     # inches
     transmission_eff: float = GEAR_PAIR_EFF ** 2 # -
     gear_ratio: float = 9.665                    # - 
+    tire_rr_f0: float = 0.008                    # - 
+    tire_rr_f2: float = 0.4e-7                   # (km/h)^-2 
+    C_x: float = 0.29                            # -
+    frontal_area: float = 2.38                   # m^2 
     
     @property
     def total_mass(self):
@@ -82,3 +86,23 @@ class Vehicle:
         
         return (self.transmission_eff * C_mot 
                 * self.gear_ratio / self.tire_effective_radius_rear)
+    
+    def tractive_power(self, motor, rpm):
+        """
+        Takes an array of rpm and returns an array of the corresponding tractive power values
+        (! PEAK values -> divide by overcharging factor to get nominal)
+        
+        In:
+          rpm (np.array) : motor rotation speed in rpm (< max_rpm)
+          motor (class Motor): specific motor to pass to the method
+        
+        Out:
+              (np.array) : tractive power in W
+        """    
+        
+        F_t = self.tractive_force(motor, rpm)
+        R_er = self.tire_effective_radius_rear
+        gear_ratio = self.gear_ratio
+        omega = rpm * RPM_TO_RADS
+        
+        return F_t * omega * R_er / gear_ratio
