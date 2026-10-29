@@ -56,7 +56,7 @@ class Motor:
         Takes an array of rpm and returns an array of the corresponding torque values
         (! PEAK values -> divide by overcharging_factor to get nominal)
         In:
-          rpm (np.array) : motor rotation speed in rpm (< rpm_max)
+          rpm (np.array) : motor rotation speed in rpm (< max_rpm)
     
         Out:
               (np.array) : motor torque in Nm
@@ -77,7 +77,7 @@ class Motor:
         Takes an array of rpm and returns an array of the corresponding power values
         (! PEAK values -> divide by overcharging_factor to get nominal)
         In:
-          rpm (np.array) : motor rotation speed in rpm (< rpm_max)
+          rpm (np.array) : motor rotation speed in rpm (< max_rpm)
     
         Out:
               (np.array) : motor power in W

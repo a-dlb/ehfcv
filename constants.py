@@ -11,4 +11,4 @@ import numpy as np
 G = 9.81 # m/s^2 
 INCH_TO_M = 25.4e-3 # m/inch
 GEAR_PAIR_EFF = 0.9875 # -
-RPM_TO_RADS = 2 * np.pi / 60
+RPM_TO_RADS = 2 * np.pi / 60 # rad/rpm
