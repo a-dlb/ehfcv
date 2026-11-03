@@ -28,6 +28,9 @@ class Vehicle:
     tire_rr_f2: float = 0.4e-7                   # (km/h)^-2 
     C_x: float = 0.29                            # -
     frontal_area: float = 2.38                   # m^2 
+    wheelbase: float = 2.570                     # m
+    height_CG: float = 0.47                      # m 
+    
     
     @property
     def total_mass(self):
@@ -68,6 +71,16 @@ class Vehicle:
         k_z = self.tire_stiffness
         
         return R_u - F_zr/(3 * k_z)
+    
+    @property
+    def b(self):
+        """Distance between front of the car and CG (m) """
+        return self.wheelbase * self.fr_ratio[1]
+    
+    @property
+    def c(self):
+        """Distance between CG and back of the car (m) """
+        return self.wheelbase * self.fr_ratio[0]
     
     def tractive_force(self, motor, rpm):
         """

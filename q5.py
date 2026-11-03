@@ -8,7 +8,7 @@ Created on Thu Oct 29 19:20:49 2026
 
 from vehicle import Vehicle
 from motor import Motor
-from performance import top_speed
+from performance import top_speed, max_slope
 from plots import plot_topspeed
 from constants import KMH_TO_MS, RADS_TO_RPM
 from resistive_forces import total_power
@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 
-PLOT = True
+PLOT = False
 EXPORT = False
 
 # Simple helper to make the prints clearer :) 
@@ -60,6 +60,15 @@ def main():
     if limitation_nom == "redline":
         print(f"  (theoretical greatest speed: v_maxmax = {v_power_nom:.1f} (km/h)")
         
+    # faire tous les theta itérativement 
+    
+    mu = 1
+    
+    theta_max = max_slope(car, motor, power="peak", mu=mu, starting_speed=0)
+    
+    print_section("Max slope")
+    
+    print(f"Max slope at max. power from rest, mu = {mu}: {np.rad2deg(theta_max)}")
     
     # Plot top speed
     

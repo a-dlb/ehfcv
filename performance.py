@@ -8,6 +8,7 @@ Created on Thu Oct 29 19:42:57 2026
 
 from constants import G, RHO_AIR, KMH_TO_MS, RPM_TO_RADS, MS_TO_KMH
 import numpy as np
+from resistive_forces import drag_force
 
 def top_speed(vehicle, motor, power="peak", v0=0, tol=1e-2, MaxIter=1000):
     """
@@ -62,3 +63,50 @@ def top_speed(vehicle, motor, power="peak", v0=0, tol=1e-2, MaxIter=1000):
     
     else:
         return v_power * MS_TO_KMH, v_redline * MS_TO_KMH, "redline"
+    
+    
+def max_slope(vehicle, motor, power="peak", starting_speed=0.0, mu=1.0):
+    
+    # à check: gestion des unités pour V dans f_RR
+    
+    b = vehicle.b
+    L = vehicle.wheelbase
+    h = vehicle.height_CG
+    m = vehicle.total_mass
+    
+    if starting_speed == 0:
+        
+        f = vehicle.tire_rr_f0 # low speeds -> f2 negligible
+        
+        ratio = vehicle.tractive_force(motor, rpm=1e-6) / (m * G)
+        tractive_force = np.asin(ratio) if abs(ratio) <= 1 else np.pi/2
+        
+        non_slip = np.atan2(mu * b/L - f, 1 - mu * h/L)
+
+    else:
+        
+        f0 = vehicle.tire_rr_f0 
+        f2 = vehicle.tire_rr_f2
+        f = f0 + f2 * (starting_speed ** 2)
+        
+        # Tractive forces
+        F_drag = drag_force(vehicle, starting_speed)
+        F_w = vehicle.tractive_force(motor, rpm=0)
+        
+        d = (F_w - F_drag)/(m * G)
+        
+        ratio = (d - f * np.sqrt(1 + f ** 2 - d ** 2))/(1 + f ** 2)
+        tractive_force = np.asin(ratio) if abs(ratio) <= 1 else np.pi/2
+        
+        # Non slip
+        A = m * G * (1 - mu * h/L)
+        B = m * G * (f - mu * b/L)
+        C = (mu * h/L - 1) * F_drag
+        denom = np.sqrt(A ** 2 + B ** 2) 
+        
+        non_slip = np.asin(C/denom) - np.asin(A/denom)
+        
+        
+    theta_max = np.minimum(tractive_force, non_slip)
+    
+    return theta_max
