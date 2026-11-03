@@ -10,6 +10,7 @@ from constants import G, RHO_AIR, KMH_TO_MS, RPM_TO_RADS, MS_TO_KMH
 import numpy as np
 from resistive_forces import drag_force
 
+
 def top_speed(vehicle, motor, power="peak", v0=0, tol=1e-2, MaxIter=1000):
     """
     Computes the top speed of the vehicle (km/h).
@@ -65,25 +66,41 @@ def top_speed(vehicle, motor, power="peak", v0=0, tol=1e-2, MaxIter=1000):
         return v_power * MS_TO_KMH, v_redline * MS_TO_KMH, "redline"
     
     
-def max_slope(vehicle, motor, power="peak", starting_speed=0.0, mu=1.0):
+def max_slope(vehicle, motor, power="peak", starting_speed=0.0, mu=1.0, speed_units="kmh"):
+    """
+    Computes the max slope the vehicle can overcome for a given speed and mu (rad)
     
-    # à check: gestion des unités pour V dans f_RR
+     power: "peak" (default) or "nom"
+     speed_units: "kmh" (default) or "ms"
+    """
     
     b = vehicle.b
     L = vehicle.wheelbase
     h = vehicle.height_CG
     m = vehicle.total_mass
+    k_oc = motor.overcharging_factor
+    
+    F_w = vehicle.tractive_force(motor, rpm=1e-6)
+    
+    if power == "nom":
+        F_w /= k_oc
     
     if starting_speed == 0:
         
         f = vehicle.tire_rr_f0 # low speeds -> f2 negligible
         
-        ratio = vehicle.tractive_force(motor, rpm=1e-6) / (m * G)
-        tractive_force = np.asin(ratio) if abs(ratio) <= 1 else np.pi/2
+
+        ratio = F_w / (m * G)
+        tractive_force = np.asin(min(ratio, 1.0)) 
+        # If ratio > 1 : max slope is 90° ; tractive force not limiting
+        # -> set ratio to 1 to avoid asin error
         
         non_slip = np.atan2(mu * b/L - f, 1 - mu * h/L)
 
     else:
+        
+        if speed_units == "ms":
+            starting_speed = starting_speed * MS_TO_KMH
         
         f0 = vehicle.tire_rr_f0 
         f2 = vehicle.tire_rr_f2
@@ -91,22 +108,21 @@ def max_slope(vehicle, motor, power="peak", starting_speed=0.0, mu=1.0):
         
         # Tractive forces
         F_drag = drag_force(vehicle, starting_speed)
-        F_w = vehicle.tractive_force(motor, rpm=0)
         
         d = (F_w - F_drag)/(m * G)
         
         ratio = (d - f * np.sqrt(1 + f ** 2 - d ** 2))/(1 + f ** 2)
-        tractive_force = np.asin(ratio) if abs(ratio) <= 1 else np.pi/2
+        tractive_force = np.asin(min(ratio, 1.0))
         
         # Non slip
-        A = m * G * (1 - mu * h/L)
-        B = m * G * (f - mu * b/L)
+        A = m * G * (f - mu * b/L)
+        B = m * G * (1 - mu * h/L)
         C = (mu * h/L - 1) * F_drag
         denom = np.sqrt(A ** 2 + B ** 2) 
         
         non_slip = np.asin(C/denom) - np.asin(A/denom)
         
-        
-    theta_max = np.minimum(tractive_force, non_slip)
+    theta_max = min(tractive_force, non_slip)
+    limiting_factor = "traction" if tractive_force <= non_slip else "adhesion"
     
-    return theta_max
+    return theta_max, limiting_factor

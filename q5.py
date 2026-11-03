@@ -13,6 +13,7 @@ from plots import plot_topspeed
 from constants import KMH_TO_MS, RADS_TO_RPM
 from resistive_forces import total_power
 from plot_style import get_style
+from friction_coeff import MU
 import matplotlib.pyplot as plt
 
 
@@ -20,6 +21,10 @@ import numpy as np
 
 PLOT = False
 EXPORT = False
+
+# Helper to convert rads to % !
+def rad2per(theta):
+    return np.tan(theta) * 100
 
 # Simple helper to make the prints clearer :) 
 def print_section(title):
@@ -60,15 +65,48 @@ def main():
     if limitation_nom == "redline":
         print(f"  (theoretical greatest speed: v_maxmax = {v_power_nom:.1f} (km/h)")
         
-    # faire tous les theta itérativement 
-    
-    mu = 1
-    
-    theta_max = max_slope(car, motor, power="peak", mu=mu, starting_speed=0)
-    
+    # Max slope 
+    # vérifier le développement de perfo + ajouter le régime nominal
+    # (et réfléchir à cmt implémenter ça dans le rapport)
     print_section("Max slope")
     
-    print(f"Max slope at max. power from rest, mu = {mu}: {np.rad2deg(theta_max)}")
+    print("From rest (0 km/h) \n")
+    print("SURFACE: max slope (°) / max slope (%) (limiting_factor) \n")
+
+    for surface, values in MU.items():
+        
+        results = [max_slope(car, motor, power="peak", 
+                                      mu=m, starting_speed=0) for m in values] # theta (rad), limiting_factor
+        max_slope
+        thetas = [r[0] for r in results]
+        lim_fact = [r[1] for r in results]
+        
+        deg = " - ".join(f"{np.rad2deg(t):.1f}°" for t in thetas)
+        per = " - ".join(f"{rad2per(t):.1f} %" for t in thetas)
+        lim = " - ".join(f"{l}" for l in lim_fact)
+        # .join allows to print one or two values separed by the string 
+
+        print(f"  {surface}: {deg} / {per} ({lim})")
+    
+    
+        
+    print("\n" * 2 + "At 80 km/h \n")
+    print("SURFACE: max slope (°) / max slope (%) (limiting_factor) \n")
+    
+    for surface, values in MU.items():
+        
+        results = [max_slope(car, motor, power="peak", 
+                                      mu=m, starting_speed=80) for m in values] # theta (rad), limiting_factor
+        max_slope
+        thetas = [r[0] for r in results]
+        lim_fact = [r[1] for r in results]
+        
+        deg = " - ".join(f"{np.rad2deg(t):.1f}°" for t in thetas)
+        per = " - ".join(f"{rad2per(t):.1f} %" for t in thetas)
+        lim = " - ".join(f"{l}" for l in lim_fact)
+        # .join allows to print one or two values separed by the string 
+
+        print(f"  {surface}: {deg} / {per} ({lim})")
     
     # Plot top speed
     
