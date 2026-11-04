@@ -66,10 +66,11 @@ def top_speed(vehicle, motor, power="peak", v0=0, tol=1e-2, MaxIter=1000):
         return v_power * MS_TO_KMH, v_redline * MS_TO_KMH, "redline"
     
     
-def max_slope(vehicle, motor, power="peak", starting_speed=0.0, mu=1.0, speed_units="kmh"):
+def max_slope(vehicle, motor, power="peak", crit="friction", starting_speed=0.0, mu=1.0, speed_units="kmh"):
     """
     Computes the max slope the vehicle can overcome for a given speed and mu (rad)
     
+     crit: "friction" (default) or "adhesion"
      power: "peak" (default) or "nom"
      speed_units: "kmh" (default) or "ms"
     """
@@ -86,43 +87,58 @@ def max_slope(vehicle, motor, power="peak", starting_speed=0.0, mu=1.0, speed_un
         F_w /= k_oc
     
     if starting_speed == 0:
-        
-        f = vehicle.tire_rr_f0 # low speeds -> f2 negligible
-        
 
-        ratio = F_w / (m * G)
-        tractive_force = np.asin(min(ratio, 1.0)) 
-        # If ratio > 1 : max slope is 90° ; tractive force not limiting
-        # -> set ratio to 1 to avoid asin error
+        if crit == "traction":
         
-        non_slip = np.atan2(mu * b/L - f, 1 - mu * h/L)
+            ratio = F_w / (m * G)
+            theta_max_traction = np.asin(min(ratio, 1.0)) 
+            # If ratio > 1 : max slope is 90° ; tractive force not limiting
+            # -> set ratio to 1 to avoid asin error
+            
+            return theta_max_traction
+        
+        elif crit == "adhesion":
+            
+            f = vehicle.tire_rr_f0 # low speeds -> f2 negligible
+            theta_max_adhesion = np.atan2(mu * b/L - f, 1 - mu * h/L)
+            
+            return theta_max_adhesion
+        
+        else:
+            raise ValueError("crit must be 'adhesion' or 'tractio', not {crit}")
 
     else:
         
         if speed_units == "ms":
             starting_speed = starting_speed * MS_TO_KMH
-        
+            
         f0 = vehicle.tire_rr_f0 
         f2 = vehicle.tire_rr_f2
         f = f0 + f2 * (starting_speed ** 2)
         
-        # Tractive forces
         F_drag = drag_force(vehicle, starting_speed)
         
-        d = (F_w - F_drag)/(m * G)
+        if crit == "traction":
+            
+            # Tractive forces
+            d = (F_w - F_drag)/(m * G)
+            
+            ratio = (d - f * np.sqrt(1 + f ** 2 - d ** 2))/(1 + f ** 2)
+            theta_max_traction = np.asin(min(ratio, 1.0))
+            
+            return theta_max_traction
         
-        ratio = (d - f * np.sqrt(1 + f ** 2 - d ** 2))/(1 + f ** 2)
-        tractive_force = np.asin(min(ratio, 1.0))
+        elif crit == "adhesion":
+            
+            # Non slip
+            A = m * G * (f - mu * b/L)
+            B = m * G * (1 - mu * h/L)
+            C = (mu * h/L - 1) * F_drag
+            denom = np.sqrt(A ** 2 + B ** 2) 
+            
+            theta_max_adhesion = np.asin(C/denom) - np.asin(A/denom)
+            
+            return theta_max_adhesion
         
-        # Non slip
-        A = m * G * (f - mu * b/L)
-        B = m * G * (1 - mu * h/L)
-        C = (mu * h/L - 1) * F_drag
-        denom = np.sqrt(A ** 2 + B ** 2) 
-        
-        non_slip = np.asin(C/denom) - np.asin(A/denom)
-        
-    theta_max = min(tractive_force, non_slip)
-    limiting_factor = "traction" if tractive_force <= non_slip else "adhesion"
-    
-    return theta_max, limiting_factor
+        else:
+            raise ValueError("crit must be 'adhesion' or 'tractio', not {crit}")

@@ -9,13 +9,12 @@ Created on Thu Oct 29 19:20:49 2026
 from vehicle import Vehicle
 from motor import Motor
 from performance import top_speed, max_slope
-from plots import plot_topspeed
+from plots import plot_topspeed, plot_max_slopes
 from constants import KMH_TO_MS, RADS_TO_RPM
 from resistive_forces import total_power
 from plot_style import get_style
 from friction_coeff import MU
 import matplotlib.pyplot as plt
-
 
 import numpy as np
 
@@ -66,48 +65,43 @@ def main():
         print(f"  (theoretical greatest speed: v_maxmax = {v_power_nom:.1f} (km/h)")
         
     # Max slope 
-    # vérifier le développement de perfo + ajouter le régime nominal
+    # vérifier le développement de perfo + ajouter le régime nominal (voir TPs en fait)
     # (et réfléchir à cmt implémenter ça dans le rapport)
     print_section("Max slope")
     
-    print("From rest (0 km/h) \n")
-    print("SURFACE: max slope (°) / max slope (%) (limiting_factor) \n")
+    powers = ["peak", "nom"]
+    speeds = [0, 80] # km/h
+    
+    # Store data for plotting
+    data = {s: ({}, []) for s in speeds}
+    
+    for p in powers:
+        for s in speeds:
+            print(f"From {s} km/h (Power = {p})\n")
+    
+            theta_max_traction = max_slope(car, motor, power=p, crit="traction", starting_speed=s)
+            print(f"  traction max slope (%) : {rad2per(theta_max_traction):.1f} \n")
+            
+            # Store data for plotting
+            data[s][0][p] = rad2per(theta_max_traction)
+    
+            print("  adhesion max slopes (%) + conclusion (limiting_factor)")
+            for name, values in MU.items():
+    
+                thetas_max_adhesion = [max_slope(car, motor, power="peak", crit="adhesion", starting_speed=s, mu=mu)
+                                       for mu in values]
+                
+                # Store data for plotting
+                if p == powers[0]:
+                    data[s][1].append((name, list(values), [rad2per(t) for t in thetas_max_adhesion]))
+    
+                print(f"    {name}: " + " - ".join(
+                    f"{rad2per(t):.1f}% ({'adhesion' if t < theta_max_traction else 'traction'})"
+                    for t in thetas_max_adhesion))
+            print("\n")
+    
+        
 
-    for surface, values in MU.items():
-        
-        results = [max_slope(car, motor, power="peak", 
-                                      mu=m, starting_speed=0) for m in values] # theta (rad), limiting_factor
-        max_slope
-        thetas = [r[0] for r in results]
-        lim_fact = [r[1] for r in results]
-        
-        deg = " - ".join(f"{np.rad2deg(t):.1f}°" for t in thetas)
-        per = " - ".join(f"{rad2per(t):.1f} %" for t in thetas)
-        lim = " - ".join(f"{l}" for l in lim_fact)
-        # .join allows to print one or two values separed by the string 
-
-        print(f"  {surface}: {deg} / {per} ({lim})")
-    
-    
-        
-    print("\n" * 2 + "At 80 km/h \n")
-    print("SURFACE: max slope (°) / max slope (%) (limiting_factor) \n")
-    
-    for surface, values in MU.items():
-        
-        results = [max_slope(car, motor, power="peak", 
-                                      mu=m, starting_speed=80) for m in values] # theta (rad), limiting_factor
-        max_slope
-        thetas = [r[0] for r in results]
-        lim_fact = [r[1] for r in results]
-        
-        deg = " - ".join(f"{np.rad2deg(t):.1f}°" for t in thetas)
-        per = " - ".join(f"{rad2per(t):.1f} %" for t in thetas)
-        lim = " - ".join(f"{l}" for l in lim_fact)
-        # .join allows to print one or two values separed by the string 
-
-        print(f"  {surface}: {deg} / {per} ({lim})")
-    
     # Plot top speed
     
     if PLOT:
@@ -135,6 +129,11 @@ def main():
                 
                 plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redline, k_oc, highlight=regime, export_path=path)
     
+    
+        with plt.rc_context(get_style(style="maxslope")):
+            
+            plot_max_slopes(data, powers, export_path="Graphs/q5_slopes.png")
+        
     return
 
 
