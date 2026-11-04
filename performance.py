@@ -8,7 +8,9 @@ Created on Thu Oct 29 19:42:57 2026
 
 from constants import G, RHO_AIR, KMH_TO_MS, RPM_TO_RADS, MS_TO_KMH
 import numpy as np
-from resistive_forces import drag_force
+from resistive_forces import drag_force, net_force
+from scipy.integrate import cumulative_trapezoid
+from scipy.interpolate import make_interp_spline
 
 
 def top_speed(vehicle, motor, power="peak", v0=0, tol=1e-2, MaxIter=1000):
@@ -141,4 +143,67 @@ def max_slope(vehicle, motor, power="peak", crit="friction", starting_speed=0.0,
             return theta_max_adhesion
         
         else:
-            raise ValueError("crit must be 'adhesion' or 'tractio', not {crit}")
+            raise ValueError("crit must be 'adhesion' or 'traction', not '{crit}'")
+            
+
+def accel_time(vehicle, motor, interval, interval_type="speed", power="peak"):
+    
+    if interval_type not in ("speed", "distance"):
+        raise ValueError(f"interval_type must be 'speed' or 'distance', not '{interval_type}'")
+        
+    if power not in ("peak", "nom"):
+        raise ValueError(f"power must be 'peak' or 'nom', not '{power}'")
+
+    v_min, target = np.asarray(interval, dtype=float)
+    m_et = vehicle.total_effective_mass(motor)
+    v_cap = vehicle.max_speed # km/h
+
+    if interval_type == "speed":
+        
+        if target > v_cap:
+            raise ValueError(f"Target speed {target} km/h exceeds max_speed {v_cap} km/h")
+            
+        v_max = target
+        
+    else:
+        v_max = v_cap
+
+    speed = np.linspace(v_min, v_max, 1000) # km/h
+    speed_ms = speed * KMH_TO_MS            # m/s
+
+    F_net = net_force(vehicle, motor, speed, slope=0, power=power)
+    
+    # only problematic in case of a high slope a nominal power probably
+    if np.any(F_net <= 0):
+        raise ValueError("F_net <= 0 in the interval: speed not reachable")
+        
+    inv_F = 1 / F_net
+
+    if interval_type == "speed":
+        return m_et * np.trapezoid(inv_F, speed_ms)
+
+    # Distance mode
+    
+    # ∆t = t(x)
+    dt = m_et * cumulative_trapezoid(inv_F, speed_ms, initial=0)
+    
+    # ∆x = x(v)
+    dx = m_et * cumulative_trapezoid(speed_ms * inv_F, speed_ms, initial=0)
+
+    # dx[-1] = distance reached when v_max is reached
+    # -> if target_∆x <= dx[-1],
+    # ∆t = t(x(v)) obtained with np.interp
+    
+    if target <= dx[-1]:
+        return np.interp(target, dx, dt)
+
+    # -> if target_∆x > dx[-1]
+    # ∆t = dt[-1] + (target_∆x - dx[-1]) / (v_max in m_s)
+    #   where dt[-1] = time to reach v_max 
+    #         (target_∆x - dx[-1]) = distance left to cover after that
+    #         (target_∆x - dx[-1]) / (v_max in m_s) = time to cover remaining distance
+    #                                                 at v_max
+    
+    else:
+        return dt[-1] + (target - dx[-1]) / speed_ms[-1]
+    

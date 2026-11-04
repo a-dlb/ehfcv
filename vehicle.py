@@ -29,7 +29,8 @@ class Vehicle:
     C_x: float = 0.29                            # -
     frontal_area: float = 2.38                   # m^2 
     wheelbase: float = 2.570                     # m
-    height_CG: float = 0.47                      # m 
+    height_CG: float = 0.47                      # m
+    max_speed: float = 150                           # km/h
     
     
     @property
@@ -81,6 +82,26 @@ class Vehicle:
     def c(self):
         """Distance between CG and back of the car (m) """
         return self.wheelbase * self.fr_ratio[0]
+    
+    def gamma(self, motor):
+        """ Gamma = ratio between effective mass and empty vehicle mass (-) """
+        
+        R_e = self.tire_effective_radius_rear
+        m = self.vehicle_mass
+        J_m = motor.rotor_inertia
+        gamma = 1.04 + (J_m/(m * (R_e ** 2))) * (self.gear_ratio ** 2)
+        
+        return gamma
+    
+    def total_effective_mass(self, motor):
+        """ Total effective mass (m_e + m_d) (kg) """
+        
+        gamma = self.gamma(motor)
+        m = self.vehicle_mass
+        m_e = gamma * m
+        m_d = self.driver_mass
+        
+        return m_e + m_d
     
     def tractive_force(self, motor, rpm):
         """

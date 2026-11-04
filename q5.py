@@ -8,7 +8,7 @@ Created on Thu Oct 29 19:20:49 2026
 
 from vehicle import Vehicle
 from motor import Motor
-from performance import top_speed, max_slope
+from performance import top_speed, max_slope, accel_time
 from plots import plot_topspeed, plot_max_slopes
 from constants import KMH_TO_MS, RADS_TO_RPM
 from resistive_forces import total_power
@@ -70,7 +70,7 @@ def main():
     print_section("Max slope")
     
     powers = ["peak", "nom"]
-    speeds = [0, 80] # km/h
+    speeds = [0, 100] # km/h
     
     # Store data for plotting
     data = {s: ({}, []) for s in speeds}
@@ -100,7 +100,26 @@ def main():
                     for t in thetas_max_adhesion))
             print("\n")
     
+    
+    # Acceleration times
+    
+    print_section("Acceleration times")
+    
+    for p in powers:
         
+        print(f"Acceleration times at {p} power")
+        
+        dT1 = accel_time(car, motor, [80, 120], power=p)
+        print(f"  From 80 to 120 km/h : ∆t = {dT1:.1f} s \n")
+        
+        dT2 = accel_time(car, motor, [1e-6, 100], power=p)
+        print(f"  From 0 to 100 km/h : ∆t = {dT2:.1f} s \n")
+        
+        dT3 = accel_time(car, motor, [1e-6, 400], interval_type="distance", power=p)
+        print(f"  To cover 400m from rest : ∆t = {dT3:.1f} s " + "\n" * 2)
+        
+        # 1e-6 to avoid division by 0 
+
 
     # Plot top speed
     

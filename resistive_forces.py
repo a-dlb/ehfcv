@@ -6,7 +6,7 @@ Created on Thu Oct 29 18:17:12 2026
 @author: antoinedlbck
 """
 
-from constants import G, KMH_TO_MS, MS_TO_KMH, RHO_AIR
+from constants import G, KMH_TO_MS, MS_TO_KMH, RHO_AIR, RADS_TO_RPM
 import numpy as np
 
 def rolling_res_coef(f0, f2, speed, speed_in_ms=False):
@@ -95,3 +95,29 @@ def total_power(vehicle, speed, slope, speed_in_ms=False):
     
     return F_tot * speed
     
+
+def net_force(vehicle, motor, speed, slope, power="peak", speed_in_ms=False):
+    """
+    Net force F_net (N)
+    /!\ speed is expected in (km/h) (and slope in (%))
+    power = "peak" (default) or "nom"
+    """  
+    
+    if speed_in_ms:
+        speed = speed * MS_TO_KMH
+    
+    gear_ratio = vehicle.gear_ratio
+    R_er = vehicle.tire_effective_radius_rear
+    k_oc = motor.overcharging_factor
+    
+    rpm = ((speed * KMH_TO_MS) * gear_ratio / R_er) * RADS_TO_RPM
+    
+    F_tot = total_force(vehicle, speed, slope)
+    F_w = vehicle.tractive_force(motor, rpm)
+    
+    if power == "nom":
+        F_w /= k_oc
+
+    F_net = F_w - F_tot
+    
+    return F_net
