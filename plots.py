@@ -93,7 +93,9 @@ def plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redl
 
     
     # v_max
-    ax.axvline(v_max, ls="--", color="red", label=r"$v_\mathsf{{max}}$")
+    y_limb, y_limt = ax.get_ylim()
+    ax.axvline(v_max, ymax=(eta_tr * P_max * 1e-3)/y_limt, ls="dotted", color="red", label=r"$v_\mathsf{{max}}$", alpha=alpha_peak)
+    ax.axvline(v_max, ymax=(eta_tr * P_max * 1e-3 / k_oc)/y_limt, ls="dotted", color="red", label=r"$v_\mathsf{{max}}$", alpha=alpha_nom)
     ax.scatter(v_max, eta_tr * P_max * 1e-3, color="red", alpha=alpha_peak, zorder=4)
     ax.scatter(v_max, eta_tr * P_max * 1e-3 / k_oc, color="red", alpha=alpha_nom, zorder=4)
             
@@ -103,9 +105,9 @@ def plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redl
     v_maxmax_peak = speed[i]
     p_maxmax = resistive_power[i] * 1e-3
     ax.scatter(v_maxmax_peak, p_maxmax, color="purple", alpha=alpha_peak, zorder=4)
-    ax.axvline(v_maxmax_peak, ls="--", color="purple", 
+    ax.axvline(v_maxmax_peak, ls="dotted", color="purple", 
                label=r"$v_\mathsf{{max}}^\mathsf{{max}}$ (peak)",
-               alpha=alpha_peak)
+               alpha=alpha_peak, ymax=p_maxmax/y_limt)
     
     # v_maxmax (nom)
     level = eta_tr * P_max / k_oc
@@ -113,9 +115,9 @@ def plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redl
     v_maxmax_nom = speed[i]
     p_maxmax = resistive_power[i] * 1e-3
     ax.scatter(v_maxmax_nom, p_maxmax, color="purple", alpha=alpha_nom, zorder=4)
-    ax.axvline(v_maxmax_nom, ls="--", color="purple", 
+    ax.axvline(v_maxmax_nom, ls="dotted", color="purple", 
                label=r"$v_\mathsf{{max}}^\mathsf{{max}}$ (nom)",
-               alpha=alpha_nom)
+               alpha=alpha_nom, ymax=p_maxmax/y_limt)
 
     xmax = speed.max()
     v_maxs = [v_max, v_maxmax_peak, v_maxmax_nom]
