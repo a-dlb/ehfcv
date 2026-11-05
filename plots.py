@@ -94,8 +94,10 @@ def plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redl
     
     # v_max
     y_limb, y_limt = ax.get_ylim()
-    ax.axvline(v_max, ymax=(eta_tr * P_max * 1e-3)/y_limt, ls="dotted", color="red", label=r"$v_\mathsf{{max}}$", alpha=alpha_peak)
-    ax.axvline(v_max, ymax=(eta_tr * P_max * 1e-3 / k_oc)/y_limt, ls="dotted", color="red", label=r"$v_\mathsf{{max}}$", alpha=alpha_nom)
+    ax.axvline(v_max, ymax=(eta_tr * P_max * 1e-3)/y_limt, ls="dotted", color="red", 
+               label=r"$v_\mathsf{{max}}$" if highlight=="peak" else None, alpha=alpha_peak)
+    ax.axvline(v_max, ymax=(eta_tr * P_max * 1e-3 / k_oc)/y_limt, ls="dotted", color="red", 
+               label=r"$v_\mathsf{{max}}$" if highlight=="nominal" else None, alpha=alpha_nom)
     ax.scatter(v_max, eta_tr * P_max * 1e-3, color="red", alpha=alpha_peak, zorder=4)
     ax.scatter(v_max, eta_tr * P_max * 1e-3 / k_oc, color="red", alpha=alpha_nom, zorder=4)
             
@@ -148,10 +150,10 @@ def plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redl
     ax.set_xlabel("Speed (km/h)")
     ax.set_ylabel("Power (kW)")
                     
-    fig.legend(loc="lower center", bbox_to_anchor=(0.5, -0.22), ncol=2)
+    fig.legend(loc="lower center", bbox_to_anchor=(0.5, -0.26), ncol=2)
     
     if export_path:
-        fig.savefig(export_path, dpi=300)
+        fig.savefig(export_path, dpi=300, bbox_inches="tight")
     
     return fig
 
