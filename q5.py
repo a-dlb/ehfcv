@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 
-PLOT = False
+PLOT = True
 EXPORT = False
 
 # Helper to convert rads to % !
@@ -146,7 +146,9 @@ def main():
                 
                 resistive_power = total_power(car, speed, 0) # slope = 0%
                 
-                plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redline, k_oc, highlight=regime, export_path=path)
+                vplot = v_peak if regime == "peak" else v_nom
+                
+                plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redline, k_oc, vplot, highlight=regime, export_path=path)
     
     
         with plt.rc_context(get_style(style="maxslope")):

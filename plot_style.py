@@ -29,6 +29,7 @@ def get_style(style="default"):
         "ytick.major.size": 10,
         "legend.fontsize": 25,
         "figure.constrained_layout.use": True,
+        "lines.markersize": 20,
         
         }
     

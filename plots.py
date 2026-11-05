@@ -73,7 +73,7 @@ def plot_traction(rpm, F_t, export_path=None):
     return fig
 
 
-def plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redline, k_oc, highlight, export_path=None):
+def plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redline, k_oc, v_max, highlight, export_path=None):
     
     alpha_peak = 1.0 if highlight == "peak" else 0.3
     alpha_nom = 1.0 if highlight == "nominal" else 0.3
@@ -90,11 +90,63 @@ def plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redl
             label = r"$\mathcal{P}_\mathsf{wheels, nom}$")
     ax.plot(speed, resistive_power * 1e-3, 
             label = r"Resistive power $\mathcal{P}_\mathsf{RES}$")
+
+    
+    # v_max
+    ax.axvline(v_max, ls="--", color="red", label=r"$v_\mathsf{{max}}$")
+    ax.scatter(v_max, eta_tr * P_max * 1e-3, color="red", alpha=alpha_peak, zorder=4)
+    ax.scatter(v_max, eta_tr * P_max * 1e-3 / k_oc, color="red", alpha=alpha_nom, zorder=4)
+            
+    # v_maxmax (peak)
+    level = eta_tr * P_max
+    i = np.argmin(np.abs(resistive_power - level))
+    v_maxmax_peak = speed[i]
+    p_maxmax = resistive_power[i] * 1e-3
+    ax.scatter(v_maxmax_peak, p_maxmax, color="purple", alpha=alpha_peak, zorder=4)
+    ax.axvline(v_maxmax_peak, ls="--", color="purple", 
+               label=r"$v_\mathsf{{max}}^\mathsf{{max}}$ (peak)",
+               alpha=alpha_peak)
+    
+    # v_maxmax (nom)
+    level = eta_tr * P_max / k_oc
+    i = np.argmin(np.abs(resistive_power - level))
+    v_maxmax_nom = speed[i]
+    p_maxmax = resistive_power[i] * 1e-3
+    ax.scatter(v_maxmax_nom, p_maxmax, color="purple", alpha=alpha_nom, zorder=4)
+    ax.axvline(v_maxmax_nom, ls="--", color="purple", 
+               label=r"$v_\mathsf{{max}}^\mathsf{{max}}$ (nom)",
+               alpha=alpha_nom)
+
+    xmax = speed.max()
+    v_maxs = [v_max, v_maxmax_peak, v_maxmax_nom]
+    
+    base = [t for t in ax.get_xticks()
+            if 0 <= t <= xmax and all((abs(t - v) > 0.05 * xmax) for v in v_maxs)]
+    xtk = sorted(base + v_maxs)
+    
+    is_special = lambda t: np.isclose(t, v_maxs).any()
+    
+    ax.set_xticks(xtk)
+    ax.set_xticklabels([f"{t:.1f}" if is_special(t) else f"{t:.0f}" for t in xtk])
+    
+    for tl, t in zip(ax.get_xticklabels(), xtk):
+        if np.isclose(t, v_max):
+            tl.set_color("red")
+            tl.set_fontweight("bold")
+        elif np.isclose(t, v_maxmax_peak):
+            tl.set_color("purple")
+            tl.set_fontweight("bold")
+            tl.set_alpha(alpha_peak)
+        elif np.isclose(t, v_maxmax_nom):
+            tl.set_color("purple")
+            tl.set_fontweight("bold")
+            tl.set_alpha(alpha_nom)
+                    
     ax.set_xlim(0, speed.max())
     ax.set_xlabel("Speed (km/h)")
     ax.set_ylabel("Power (kW)")
-    
-    fig.legend(loc="lower center", bbox_to_anchor=(0.5, -0.2), ncol=2)
+                    
+    fig.legend(loc="lower center", bbox_to_anchor=(0.5, -0.22), ncol=2)
     
     if export_path:
         fig.savefig(export_path, dpi=300)
