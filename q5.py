@@ -70,7 +70,7 @@ def main():
     print_section("Max slope")
     
     powers = ["peak", "nom"]
-    speeds = [0, 100] # km/h
+    speeds = [0, 80] # km/h
     
     # Store data for plotting
     data = {s: ({}, []) for s in speeds}
