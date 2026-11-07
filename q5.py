@@ -47,7 +47,7 @@ def main():
     v_power_peak, v_redline_peak, limitation_peak = top_speed(car, motor, power="peak")
     v_peak = v_power_peak if limitation_peak == "power" else v_redline_peak
     
-    v_power_nom, v_redline_nom, limitation_nom = top_speed(car, motor, power="nominal")
+    v_power_nom, v_redline_nom, limitation_nom = top_speed(car, motor, power="nom")
     v_nom = v_power_nom if limitation_nom == "power" else v_redline_nom
     
     print_section("Top speed")
@@ -125,7 +125,7 @@ def main():
     
     if PLOT:
     
-        regimes = ["peak", "nominal"]
+        regimes = ["peak", "nom"]
         
         # vérifier si je peux pas faire ça + joli et rajouter le tracé de vmax etc"""
         with plt.rc_context(get_style()):

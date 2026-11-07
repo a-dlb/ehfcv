@@ -33,10 +33,10 @@ def top_speed(vehicle, motor, power="peak", v0=0, tol=1e-2, MaxIter=1000):
 
     if power == "peak":
             P_1 = motor.power_peak
-    elif power == "nominal":
+    elif power == "nom":
             P_1 = motor.power_nominal
     else:
-        raise ValueError(f"power must be 'peak' or 'nominal', got '{power}'")
+        raise ValueError(f"power must be 'peak' or 'nom', got '{power}'")
     
     
     A = m * G * f0
@@ -173,7 +173,7 @@ def accel_time(vehicle, motor, interval, interval_type="speed", power="peak"):
 
     F_net = net_force(vehicle, motor, speed, slope=0, power=power)
     
-    # only problematic in case of a high slope a nominal power probably
+    # only problematic in case of a high slope a nom power probably
     if np.any(F_net <= 0):
         raise ValueError("F_net <= 0 in the interval: speed not reachable")
         

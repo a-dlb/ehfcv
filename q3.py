@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from motor import Motor
 from vehicle import Vehicle
 from plot_style import get_style
-from plots import plot_torque_power, plot_traction
+from plots import plot_torque_power, plot_traction, plot_power
 
 PLOT = True
 EXPORT = False
@@ -39,17 +39,22 @@ def main():
             
             rpm = np.linspace(1e-6, motor.max_rpm, 1000)
             
-            # Power/torque curves
-            for mode in ["peak", "nominal"]:
+            for mode in ["peak", "nom"]:
                 
+                # Power/torque curves
                 path = f"Graphs/{mode}_pc.pdf" if EXPORT else None
                 plot_torque_power(rpm, motor.torque(rpm), motor.power(rpm),
                                   motor.overcharging_factor, highlight=mode, export_path=path)
                 
-            # Tractive force curve
-            path = "Graphs/traction.pdf" if EXPORT else None
-            plot_traction(rpm, car.tractive_force(motor, rpm), export_path=path)
-        
+            # Tractive forces curve
+            path = "Graphs/tractive_force.pdf" if EXPORT else None
+            slopes = [0, 5, 10] # %
+            plot_traction(car, motor, slopes, export_path=path)
+            
+            # Tractive power curve
+            path = "Graphs/tractive_power.pdf" if EXPORT else None
+            slopes = [0, 5, 10] # %
+            plot_power(car, motor, slopes, export_path=path)
 
 if __name__ == "__main__":
     
