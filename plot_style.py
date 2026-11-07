@@ -27,7 +27,7 @@ def get_style(style="default"):
         "grid.linewidth": 1,
         "xtick.major.size": 10,
         "ytick.major.size": 10,
-        "legend.fontsize": 25,
+        "legend.fontsize": 26,
         "figure.constrained_layout.use": True,
         "lines.markersize": 20,
         
@@ -39,15 +39,15 @@ def get_style(style="default"):
         style_dict = get_style("default")
         style_dict.update({
 
-        "xtick.labelsize": 22,
-        "ytick.labelsize": 22,
+        "xtick.labelsize": 25,
+        "ytick.labelsize": 25,
         "xtick.major.pad": 8,
         "ytick.major.pad": 8,
-        "font.size": 24,
-        "figure.figsize": (24, 13),
+        "font.size": 28,
+        "figure.figsize": (22, 12),
         "lines.linewidth": 4,
         "axes.labelpad": 10,
-        "legend.fontsize": 20,
+        "legend.fontsize": 30,
 
         })
     

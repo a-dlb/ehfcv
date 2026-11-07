@@ -21,6 +21,7 @@ import numpy as np
 PLOT = True
 EXPORT = False
 
+
 # Helper to convert rads to % !
 def rad2per(theta):
     return np.tan(theta) * 100

@@ -106,33 +106,60 @@ def plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redl
     xmax = speed.max()
     v_maxs = [v_max, v_maxmax_peak, v_maxmax_nom]
     
-    base = [t for t in ax.get_xticks()
-            if 0 <= t <= xmax and all((abs(t - v) > 0.05 * xmax) for v in v_maxs)]
-    xtk = sorted(base + v_maxs)
+    base = [t for t in ax.get_xticks() if 0 <= t <= xmax]
+    xtk = sorted(set(base + v_maxs))
     
     is_special = lambda t: np.isclose(t, v_maxs).any()
+    is_near = lambda t: any(abs(t - v) <= 0.1 * xmax for v in v_maxs)
+    
+    labels = []
+    for t in xtk:
+        if is_special(t):
+            labels.append(f"{t:.1f}")
+        elif is_near(t):
+            labels.append("")
+        else:
+            labels.append(f"{t:.0f}")
     
     ax.set_xticks(xtk)
-    ax.set_xticklabels([f"{t:.1f}" if is_special(t) else f"{t:.0f}" for t in xtk])
+    ax.set_xticklabels(labels)
     
-    for tl, t in zip(ax.get_xticklabels(), xtk):
+    lw = 6
+    
+    for tick, t in zip(ax.xaxis.get_major_ticks(), xtk):
         if np.isclose(t, v_max):
-            tl.set_color("red")
-            tl.set_fontweight("bold")
+            color, alpha = "red", 1.0
         elif np.isclose(t, v_maxmax_peak):
-            tl.set_color("purple")
-            tl.set_fontweight("bold")
-            tl.set_alpha(alpha_peak)
+            color, alpha = "purple", alpha_peak
         elif np.isclose(t, v_maxmax_nom):
-            tl.set_color("purple")
-            tl.set_fontweight("bold")
-            tl.set_alpha(alpha_nom)
+            color, alpha = "purple", alpha_nom
+        else:
+            continue
+    
+        tick.label1.set_color(color)
+        tick.label1.set_fontweight("bold")
+        tick.label1.set_alpha(alpha)
+    
+        tick.tick1line.set_marker("o")
+        tick.tick1line.set_markersize(lw)
+        tick.tick1line.set_markeredgewidth(0)
+        tick.tick1line.set_markerfacecolor(color)
+        tick.tick1line.set_markeredgecolor(color)
+        tick.tick1line.set_alpha(alpha)
                     
     ax.set_xlim(0, speed.max())
     ax.set_xlabel("Speed (km/h)")
     ax.set_ylabel("Power (kW)")
                     
-    fig.legend(loc="lower center", bbox_to_anchor=(0.5, -0.26), ncol=2)
+    # We want the axes to have the same size no matter the legend size so 
+    # this is required for a little trick after drawing the legend
+    w, h = fig.get_size_inches()
+    
+    fig.legend(loc="outside lower center", ncol=2)
+    fig.get_layout_engine().set(h_pad=0.2)
+    
+    # Now we apply the box aspect given by the style dict
+    ax.set_box_aspect(h / w)
     
     if export_path:
         fig.savefig(export_path, dpi=300, bbox_inches="tight")
@@ -233,16 +260,33 @@ def plot_max_slopes(data, powers, export_path=None):
         ax.set_xlabel(" \n ", labelpad=rc["axes.labelpad"])
 
         ax.set_ylim(0, ymax)
-        base = [t for t in ax.get_yticks()
-                if 0 <= t <= ymax and all(abs(t - v) > 0.05 * ymax for v in trac.values())]
-        ytk = sorted(base + list(trac.values()))
+        
+        lw = plt.rcParams["lines.linewidth"]
+        base = [t for t in ax.get_yticks() if 0 <= t <= ymax]
+        ytk = sorted(set(base + list(trac.values())))
+        
+        is_special = lambda t: np.isclose(t, list(trac.values())).any()
+        is_near = lambda t: any(abs(t - v) <= 0.05 * ymax for v in trac.values())
+        
+        labels = []
+        for t in ytk:
+            if is_special(t):
+                labels.append(f"{t:.1f}")
+            elif is_near(t):
+                labels.append("")
+            else:
+                labels.append(f"{t:.1f}")
+        
         ax.set_yticks(ytk)
-        ax.set_yticklabels([f"{t:.1f}" for t in ytk])
-        for tl, t in zip(ax.get_yticklabels(), ytk):
+        ax.set_yticklabels(labels)
+        
+        for tick, t in zip(ax.yaxis.get_major_ticks(), ytk):
             for p, v in trac.items():
                 if np.isclose(t, v):
-                    tl.set_color(colors[p])
-                    tl.set_fontweight("bold")
+                    tick.label1.set_color(colors[p])
+                    tick.label1.set_fontweight("bold")
+                    tick.tick1line.set_markeredgecolor(colors[p])
+                    tick.tick1line.set_markeredgewidth(lw)
 
         ax.set_ylabel("Max slope (%)")
         ax.grid(axis="y", alpha=0.3, zorder=0)
@@ -255,13 +299,13 @@ def plot_max_slopes(data, powers, export_path=None):
                            label=rf"Max slope limited by traction $\theta_\mathsf{{max}}^{{(t)}}$ ({p})")
                     for p in powers]
         handles += [Line2D([], [], linestyle="", label="(adh) or (trac) = effective limiting factor")]
-
-        fig.legend(handles=handles, loc="outside lower center", ncol=2, frameon=True)
+        
+        fig.legend(handles=handles, loc="outside lower center", ncol=2)
+        fig.get_layout_engine().set(h_pad=0.2)
 
         if export_path:
             path = Path(export_path)
-            fig.savefig(path.with_name(f"{path.stem}_{s}kmh{path.suffix}"),
-                        bbox_inches="tight")
+            fig.savefig(path.with_name(f"{path.stem}_{s}kmh{path.suffix}"))
 
         figs.append(fig)
 
@@ -338,14 +382,15 @@ def plot_traction(vehicle, motor, slopes, export_path=None):
     
     # Style
     ax.set_xlabel(r"Speed (km/h)")
-    ax.set_ylabel(r"Force ($N$)")
+    ax.set_ylabel(r"Force (N)")
     ax.grid()
     
     # We want the axes to have the same size no matter the legend size so 
     # this is required for a little trick after drawing the legend
     w, h = fig.get_size_inches()
     
-    fig.legend(loc="outside lower center", ncol=2)
+    fs = plt.rcParams["legend.fontsize"] + 2
+    fig.legend(loc="outside lower center", ncol=2, fontsize=fs)
     fig.get_layout_engine().set(h_pad=0.2)
     
     # Now we apply the box aspect given by the style dict
@@ -356,7 +401,7 @@ def plot_traction(vehicle, motor, slopes, export_path=None):
     ax.xaxis.set_major_locator(FixedLocator(ticks))
     
     if export_path:
-        fig.savefig(export_path, dpi=300)
+        fig.savefig(export_path, dpi=300, bbox_inches="tight")
     
     return fig
 
@@ -447,7 +492,8 @@ def plot_power(vehicle, motor, slopes, export_path=None):
     # this is required for a little trick after drawing the legend
     w, h = fig.get_size_inches()
     
-    fig.legend(loc="outside lower center", ncol=2)
+    fs = plt.rcParams["legend.fontsize"] + 2
+    fig.legend(loc="outside lower center", ncol=2, fontsize=fs)
     fig.get_layout_engine().set(h_pad=0.2)
     
     # Now we apply the box aspect given by the style dict
@@ -462,6 +508,6 @@ def plot_power(vehicle, motor, slopes, export_path=None):
     ax.xaxis.set_major_locator(FixedLocator(ticks))
     
     if export_path:
-        fig.savefig(export_path, dpi=300)
+        fig.savefig(export_path, dpi=300, bbox_inches="tight")
     
     return fig
