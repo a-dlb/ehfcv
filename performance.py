@@ -85,6 +85,10 @@ def max_slope(vehicle, motor, power="peak", crit="friction", starting_speed=0.0,
     
     F_w = vehicle.tractive_force(motor, rpm=1e-6)
     
+    f0 = vehicle.tire_rr_f0 
+    f2 = vehicle.tire_rr_f2
+    f = f0 + f2 * (starting_speed ** 2)
+    
     if power == "nom":
         F_w /= k_oc
     
@@ -92,10 +96,11 @@ def max_slope(vehicle, motor, power="peak", crit="friction", starting_speed=0.0,
 
         if crit == "traction":
         
-            ratio = F_w / (m * G)
-            theta_max_traction = np.asin(min(ratio, 1.0)) 
-            # If ratio > 1 : max slope is 90° ; tractive force not limiting
-            # -> set ratio to 1 to avoid asin error
+            # Tractive forces
+            d = F_w/(m * G)
+            
+            ratio = (d - f * np.sqrt(1 + f ** 2 - d ** 2))/(1 + f ** 2)
+            theta_max_traction = np.asin(min(ratio, 1.0))
             
             return theta_max_traction
         
@@ -113,10 +118,6 @@ def max_slope(vehicle, motor, power="peak", crit="friction", starting_speed=0.0,
         
         if speed_units == "ms":
             starting_speed = starting_speed * MS_TO_KMH
-            
-        f0 = vehicle.tire_rr_f0 
-        f2 = vehicle.tire_rr_f2
-        f = f0 + f2 * (starting_speed ** 2)
         
         F_drag = drag_force(vehicle, starting_speed)
         
@@ -154,7 +155,7 @@ def accel_time(vehicle, motor, interval, interval_type="speed", power="peak"):
     if power not in ("peak", "nom"):
         raise ValueError(f"power must be 'peak' or 'nom', not '{power}'")
 
-    v_min, target = np.asarray(interval, dtype=float)
+    v_min, target = np.asarray(interval)
     m_et = vehicle.total_effective_mass(motor)
     v_cap = vehicle.max_speed # km/h
 
@@ -184,7 +185,7 @@ def accel_time(vehicle, motor, interval, interval_type="speed", power="peak"):
 
     # Distance mode
     
-    # ∆t = t(x)
+    # ∆t = t(v)
     dt = m_et * cumulative_trapezoid(inv_F, speed_ms, initial=0)
     
     # ∆x = x(v)
@@ -192,7 +193,8 @@ def accel_time(vehicle, motor, interval, interval_type="speed", power="peak"):
 
     # dx[-1] = distance reached when v_max is reached
     # -> if target_∆x <= dx[-1],
-    # ∆t = t(x(v)) obtained with np.interp
+    # np.interp finds the position of target in dx, and finds the
+    # corresponding value in dt by linear interpolation
     
     if target <= dx[-1]:
         return np.interp(target, dx, dt)

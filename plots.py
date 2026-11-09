@@ -292,11 +292,11 @@ def plot_max_slopes(data, powers, export_path=None):
         ax.grid(axis="y", alpha=0.3, zorder=0)
 
         handles = [Patch(facecolor="lightgray", edgecolor="gray",
-                         label=r"Max slope limited by adherence $\theta_\mathsf{{max}}^{(a)}$")]
+                         label=r"Max slope limited by adherence $\theta_\mathsf{adh}$")]
         handles += [Patch(facecolor=colors[p], label=rf"Effective max slope $\theta_\mathsf{{max}}$ ({p})")
                     for p in powers]
         handles += [Line2D([0], [0], color=colors[p], ls="--",
-                           label=rf"Max slope limited by traction $\theta_\mathsf{{max}}^{{(t)}}$ ({p})")
+                           label=rf"Max slope limited by traction $\theta_\mathsf{{trac}}$ ({p})")
                     for p in powers]
         handles += [Line2D([], [], linestyle="", label="(adh) or (trac) = effective limiting factor")]
         
@@ -389,7 +389,7 @@ def plot_traction(vehicle, motor, slopes, export_path=None):
     # this is required for a little trick after drawing the legend
     w, h = fig.get_size_inches()
     
-    fs = plt.rcParams["legend.fontsize"] + 2
+    fs = plt.rcParams["legend.fontsize"] - 2
     fig.legend(loc="outside lower center", ncol=2, fontsize=fs)
     fig.get_layout_engine().set(h_pad=0.2)
     
@@ -492,7 +492,7 @@ def plot_power(vehicle, motor, slopes, export_path=None):
     # this is required for a little trick after drawing the legend
     w, h = fig.get_size_inches()
     
-    fs = plt.rcParams["legend.fontsize"] + 2
+    fs = plt.rcParams["legend.fontsize"] - 2
     fig.legend(loc="outside lower center", ncol=2, fontsize=fs)
     fig.get_layout_engine().set(h_pad=0.2)
     
