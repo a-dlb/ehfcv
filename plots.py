@@ -13,7 +13,7 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from pathlib import Path
 from constants import RADS_TO_RPM, KMH_TO_MS
-from resistive_forces import total_force, total_power, drag_force, grading_force, rolling_res_force
+from resistive_forces import total_force, total_power, drag_force, grading_force, rolling_res_force, net_force
 
 def plot_resistive_force(vehicle, slopes, decompose=True, export_path=None):
     """
@@ -91,7 +91,7 @@ def plot_resistive_force(vehicle, slopes, decompose=True, export_path=None):
         figs.append(fig)
         
         if export_path:
-            fig.savefig(export_path, dpi=300)
+            fig.savefig(export_path + f"_{s}percent.pdf", dpi=300)
         
     return figs
 
@@ -112,8 +112,8 @@ def plot_resistive_power(vehicle, slopes, export_path=None):
 
     Returns
     -------
-    list(plt.fig)
-        The plots!
+    plt.fig
+        The plot!
     """
     
     speed = np.linspace(1e-6, vehicle.max_speed, 1000) # km/h
@@ -179,6 +179,197 @@ def plot_torque_power(rpm, C_peak, P_peak, k_oc, highlight="peak", export_path=N
     if export_path:
         fig.savefig(export_path, dpi=300)
         
+    return fig
+
+
+def plot_netforce(vehicle, motor, speed, slopes, highlight="peak", export_path=True):
+    """
+    Plots the net force as a function of the speed an the slopes.
+
+    Parameters
+    ----------
+    vehicle : Vehicle()
+        The vehicle to take into account.
+    motor : Motor()
+        The motor in the vehicle.
+    speed : np.ndarray
+        The speeds to consider (in km/h).
+    slopes : np.ndarray
+        The slopes for the grading force (in %)
+    highlight : string, optional
+        Which power mode to put in evidence. The default is "peak".
+    export_path : string, optional
+        If export, specify the path. The default is None.
+
+    Returns
+    -------
+    plt.fig
+        The plot!
+    """
+    
+    
+    alpha_peak = 1.0 if highlight == "peak" else 0.3
+    alpha_nom = 1.0 if highlight == "nom" else 0.3
+    
+    fig, ax = plt.subplots()
+    
+    for s in slopes:
+        
+        F_net_peak = net_force(vehicle, motor, speed, s, power="peak")
+        F_net_nom = net_force(vehicle, motor, speed, s, power="nom")
+        
+        ax.plot(speed, F_net_peak, label=f"slope {s} %" if highlight=="peak" else None, alpha=alpha_peak)
+        ax.plot(speed, F_net_nom, label=f"slope {s} %" if highlight=="nom" else None, alpha=alpha_nom)
+    
+    ax.set_ylabel(r"$F_{net}$ (N)")
+    
+    rpm_base = motor.base_speed_rpm
+    R_e = vehicle.tire_effective_radius_rear
+    i_red = vehicle.gear_ratio
+    V_base_kmh = rpm_base * 2*np.pi/60 * R_e / i_red * 3.6
+    
+    ax.axvline(V_base_kmh, color="grey", linestyle="--", linewidth=3)
+    ax.axhline(0, color="black", linewidth=1.5)
+    ax.set_xlabel("Speed (km/h)")
+    ax.set_xlim(0, vehicle.max_speed)
+    ax.set_ylim(bottom=-1000)
+    ax.grid(True)
+    ax.legend(loc="upper right", framealpha=0.9)
+    
+    if export_path:
+        fig.savefig(export_path, dpi=300)
+    
+    return fig
+
+
+def plot_acc(vehicle, motor, speed, slopes, highlight="peak", export_path=True):
+    """
+    Plots the acceleration as a function of the speed an the slopes.
+
+    Parameters
+    ----------
+    vehicle : Vehicle()
+        The vehicle to take into account.
+    motor : Motor()
+        The motor in the vehicle.
+    speed : np.ndarray
+        The speeds to consider (in km/h).
+    slopes : np.ndarray
+        The slopes for the grading force (in %)
+    highlight : string, optional
+        Which power mode to put in evidence. The default is "peak".
+    export_path : string, optional
+        If export, specify the path. The default is None.
+
+    Returns
+    -------
+    plt.fig
+        The plot!
+    """
+    
+    
+    alpha_peak = 1.0 if highlight == "peak" else 0.3
+    alpha_nom = 1.0 if highlight == "nom" else 0.3
+    
+    m_et = vehicle.total_effective_mass(motor)
+    
+    fig, ax = plt.subplots()
+    
+    for s in slopes:
+        
+        a_x_peak = net_force(vehicle, motor, speed, s, power="peak") / m_et
+        a_x_nom = net_force(vehicle, motor, speed, s, power="nom") / m_et
+        
+        ax.plot(speed, a_x_peak, label=f"slope {s} %" if highlight=="peak" else None, alpha=alpha_peak)
+        ax.plot(speed, a_x_nom, label=f"slope {s} %" if highlight=="nom" else None, alpha=alpha_nom)
+    
+    ax.set_ylabel(r"$a_x$ (m/s$^2$)")
+    
+    rpm_base = motor.base_speed_rpm
+    R_e = vehicle.tire_effective_radius_rear
+    i_red = vehicle.gear_ratio
+    V_base_kmh = rpm_base * 2*np.pi/60 * R_e / i_red * 3.6
+    
+    ax.axvline(V_base_kmh, color="grey", linestyle="--", linewidth=3)
+    ax.axhline(0, color="black", linewidth=1.5)
+    ax.set_xlabel("Speed (km/h)")
+    ax.set_xlim(0, vehicle.max_speed)
+    ax.set_ylim(bottom=-1)
+    ax.grid(True)
+    ax.legend(loc="upper right", framealpha=0.9)
+    
+    if export_path:
+        fig.savefig(export_path, dpi=300)
+    
+    return fig
+
+
+def plot_acc_capa(vehicle, motor, speed, slopes, highlight="peak", export_path=True):
+    """
+    Plots the acceleration capability as a function of the speed an the slopes.
+
+    Parameters
+    ----------
+    vehicle : Vehicle()
+        The vehicle to take into account.
+    motor : Motor()
+        The motor in the vehicle.
+    speed : np.ndarray
+        The speeds to consider (in km/h).
+    slopes : np.ndarray
+        The slopes for the grading force (in %)
+    highlight : string, optional
+        Which power mode to put in evidence. The default is "peak".
+    export_path : string, optional
+        If export, specify the path. The default is None.
+
+    Returns
+    -------
+    plt.fig
+        The plot!
+    """
+    
+    
+    alpha_peak = 1.0 if highlight == "peak" else 0.3
+    alpha_nom = 1.0 if highlight == "nom" else 0.3
+    
+    m_et = vehicle.total_effective_mass(motor)
+    
+    fig, ax = plt.subplots()
+    
+    for s in slopes:
+        
+        a_x_peak = net_force(vehicle, motor, speed, s, power="peak") / m_et
+        a_x_nom = net_force(vehicle, motor, speed, s, power="nom") / m_et
+        
+        # Mask when it goes to infty
+        a_x_peak = np.where(a_x_peak > 0, a_x_peak, np.nan)
+        a_x_nom  = np.where(a_x_nom  > 0, a_x_nom,  np.nan)
+        
+        acc_capa_peak = 1/a_x_peak
+        acc_capa_nom = 1/a_x_nom
+        
+        ax.plot(speed, acc_capa_peak, label=f"slope {s} %" if highlight=="peak" else None, alpha=alpha_peak)
+        ax.plot(speed, acc_capa_nom, label=f"slope {s} %" if highlight=="nom" else None, alpha=alpha_nom)
+    
+    ax.set_ylabel(r"$1/a_x$ (s$^2$/m)")
+    
+    rpm_base = motor.base_speed_rpm
+    R_e = vehicle.tire_effective_radius_rear
+    i_red = vehicle.gear_ratio
+    V_base_kmh = rpm_base * 2*np.pi/60 * R_e / i_red * 3.6
+    
+    ax.axvline(V_base_kmh, color="grey", linestyle="--", linewidth=3)
+    ax.axhline(0, color="black", linewidth=1.5)
+    ax.set_xlabel("Speed (km/h)")
+    ax.set_xlim(0, vehicle.max_speed)
+    ax.set_ylim(0, 2)
+    ax.grid(True)
+    ax.legend(loc="upper right", framealpha=0.9)
+    
+    if export_path:
+        fig.savefig(export_path, dpi=300)
+    
     return fig
 
 

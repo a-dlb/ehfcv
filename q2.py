@@ -13,7 +13,7 @@ from plots import plot_resistive_force, plot_resistive_power
 from plot_style import get_style
 from resistive_forces import total_force, total_power, drag_force, grading_force, rolling_res_force
 
-PLOT = False
+PLOT = True
 EXPORT = False
 
 def crossing(V_kmh, f1, f2):
@@ -63,8 +63,11 @@ def main():
         
         with plt.rc_context(get_style()):
         
-            plot_resistive_force(vehicle, slopes)
-            plot_resistive_power(vehicle, slopes)
+            path = "Graphs/tractive_force" if EXPORT else None
+            plot_resistive_force(vehicle, slopes, export_path=path)
+            
+            path = "Graphs/PowerQ2.pdf" if EXPORT else None
+            plot_resistive_power(vehicle, slopes, export_path=path)
     
     return
     
