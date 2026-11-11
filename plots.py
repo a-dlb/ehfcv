@@ -13,7 +13,134 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from pathlib import Path
 from constants import RADS_TO_RPM, KMH_TO_MS
-from resistive_forces import total_force, total_power
+from resistive_forces import total_force, total_power, drag_force, grading_force, rolling_res_force
+
+def plot_resistive_force(vehicle, slopes, decompose=True, export_path=None):
+    """
+    Plot the resistive forces as a function of the speed of the vehicle 
+    slope. Plots every contribution and the total force.
+
+    Parameters
+    ----------
+    vehicle : Vehicle()
+        The vehicle to take into account.
+    slopes : np.array
+        Slopes to consider, in (%).
+    export_path : string, optional
+        If export, specify the path. The default is None.
+
+    Returns
+    -------
+    list(plt.fig)
+        The plots!
+    """
+    
+    speed = np.linspace(1e-6, vehicle.max_speed, 1000) # km/h
+
+    figs = []
+        
+    
+    def crossing(V_kmh, f1, f2):
+        """First speed (km/h) where f1 surpasses f2, None if not in the span."""
+        d = f1 - f2
+        idx = np.where(np.diff(np.sign(d)) != 0)[0]
+        if len(idx) == 0:
+            return None
+        i = idx[0]
+        # interpolation linéaire entre les deux points
+        return V_kmh[i] - d[i] * (V_kmh[i+1] - V_kmh[i]) / (d[i+1] - d[i])
+    
+    
+    for s in slopes:
+        
+        fig, ax = plt.subplots()
+        
+        F_aero  = drag_force(vehicle, speed)
+        F_roll  = rolling_res_force(vehicle, speed, s)
+        F_grade = grading_force(vehicle, s) # returns a scalar
+        F_grade = np.full_like(speed, F_grade)
+        F_tot   = total_force(vehicle, speed, s)
+    
+
+        ax.plot(speed, F_aero,  color="tab:green",  label="Aerodynamic drag")
+        ax.plot(speed, F_roll,  color="tab:orange",    label="Rolling resistance")
+        ax.plot(speed, F_grade, color="tab:pink", label=f"Grading resistance ({s:.0f} %)")
+        ax.plot(speed, F_tot,   color="tab:blue",   label="Total resistance")
+    
+        # V1 : drag = rolling ; V2 : drag = grading (si dans la plage de vitesse)
+        V1 = crossing(speed, F_aero, F_roll)
+        if V1 is not None:
+            ax.plot(V1, np.interp(V1, speed, F_roll), "o", color="black",
+                    markersize=15, zorder=5, label=rf"$V_1$ = {V1:.1f} km/h")
+        if s > 0:
+            V2 = crossing(speed, F_aero, F_grade)
+            if V2 is not None:
+                ax.plot(V2, np.interp(V2, speed, F_grade), "o", color="tab:brown",
+                        markersize=15, zorder=5, label=rf"$V_2$ = {V2:.1f} km/h")
+    
+        ax.set_xlabel("Speed (km/h)")
+        ax.set_ylabel("Resistance force (N)")
+        ax.set_xlim(0, vehicle.max_speed)
+        ax.set_ylim(bottom=-4)
+        
+        legend_kw = dict(loc="upper left", framealpha=0.9)
+        ax.legend(**legend_kw)
+        
+        ax.grid(True)
+        
+        figs.append(fig)
+        
+        if export_path:
+            fig.savefig(export_path, dpi=300)
+        
+    return figs
+
+
+def plot_resistive_power(vehicle, slopes, export_path=None):
+    """
+    Plot the  total resistive power as a function of the speed of the vehicle 
+    and slope.
+
+    Parameters
+    ----------
+    vehicle : Vehicle()
+        The vehicle to take into account.
+    slopes : np.array
+        Slopes to consider, in (%).
+    export_path : string, optional
+        If export, specify the path. The default is None.
+
+    Returns
+    -------
+    list(plt.fig)
+        The plots!
+    """
+    
+    speed = np.linspace(1e-6, vehicle.max_speed, 1000) # km/h
+    
+    fig, ax = plt.subplots()
+        
+    for s in slopes:
+        
+        P = total_power(vehicle, speed, s)
+        label = f"slope {s:.0f} %"
+        ax.plot(speed, P / 1000, label=label)     
+    
+    ax.set_xlabel("Speed (km/h)")
+    ax.set_ylabel(r"$P_{road}$ (kW)")
+    ax.set_xlim(0, vehicle.max_speed)
+    ax.set_ylim(bottom=0)
+    
+    ax.grid(True)
+    
+    legend_kw = dict(loc="upper left", framealpha=0.9)
+    ax.legend(**legend_kw)
+        
+    if export_path:
+        fig.savefig(export_path, dpi=300)
+    
+    return fig
+
 
 def plot_torque_power(rpm, C_peak, P_peak, k_oc, highlight="peak", export_path=None):
     """
