@@ -47,7 +47,7 @@ def plot_resistive_force(vehicle, slopes, decompose=True, export_path=None):
         if len(idx) == 0:
             return None
         i = idx[0]
-        # interpolation linéaire entre les deux points
+        # linear interpolation between the two points
         return V_kmh[i] - d[i] * (V_kmh[i+1] - V_kmh[i]) / (d[i+1] - d[i])
     
     
