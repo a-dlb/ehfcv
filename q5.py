@@ -9,7 +9,7 @@ Created on Thu Oct 29 19:20:49 2026
 from vehicle import Vehicle
 from motor import Motor
 from performance import top_speed, max_slope, accel_time
-from plots import plot_topspeed, plot_max_slopes
+from plots import plot_topspeed, plot_max_slopes, plot_power_opti
 from constants import KMH_TO_MS, RADS_TO_RPM, RPM_TO_RADS
 from resistive_forces import total_power
 from plot_style import get_style
@@ -18,8 +18,8 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 
-PLOT = False
-EXPORT = False
+PLOT = True
+EXPORT = True
 
 
 # Helper to convert rads to % !
@@ -47,11 +47,11 @@ def main():
     # Top speed
     v_power_peak, v_redline_peak, limitation_peak = top_speed(car, motor, power="peak")
     v_peak = v_power_peak if limitation_peak == "power" else v_redline_peak
-    i_opt_peak = motor.max_rpm * RPM_TO_RADS *  R_er / v_power_peak
+    i_opt_peak = motor.max_rpm * RPM_TO_RADS *  R_er / (v_power_peak * KMH_TO_MS)
     
     v_power_nom, v_redline_nom, limitation_nom = top_speed(car, motor, power="nom")
     v_nom = v_power_nom if limitation_nom == "power" else v_redline_nom
-    i_opt_nom = motor.max_rpm * RPM_TO_RADS *  R_er / v_power_nom
+    i_opt_nom = motor.max_rpm * RPM_TO_RADS *  R_er / (v_power_nom * KMH_TO_MS)
     
     print_section("Top speed")
     
@@ -68,9 +68,8 @@ def main():
     if limitation_nom == "redline":
         print(f"  (theoretical greatest speed: v_maxmax = {v_power_nom:.1f} (km/h)")
         print(f"  (Optimal gear ratio: {i_opt_nom:.2f} (-))")
+        
     # Max slope 
-    # vérifier le développement de perfo + ajouter le régime nominal (voir TPs en fait)
-    # (et réfléchir à cmt implémenter ça dans le rapport)
     print_section("Max slope")
     
     powers = ["peak", "nom"]
@@ -134,7 +133,6 @@ def main():
     
         regimes = ["peak", "nom"]
         
-        # vérifier si je peux pas faire ça + joli et rajouter le tracé de vmax etc"""
         with plt.rc_context(get_style()):
             
             for regime in regimes:
@@ -156,7 +154,13 @@ def main():
                 vplot = v_peak if regime == "peak" else v_nom
                 
                 plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redline, k_oc, vplot, highlight=regime, export_path=path)
-    
+                
+                # Tractive power curve with optimal gear ratios
+                i_dict = {"peak": i_opt_peak, "nom": i_opt_nom}
+                
+                path = "Graphs/tractive_power_opti.pdf" if EXPORT else None
+                slopes = [0, 5, 10] # %
+                plot_power_opti(car, motor, slopes, i_dict, export_path=path)
     
         with plt.rc_context(get_style(style="maxslope")):
             
