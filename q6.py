@@ -257,11 +257,29 @@ def main():
     print(f"{'Total':>12}{d:>10.2f}{E_out:>13.3f}{E_in:>12.3f}"
           f"{E_net:>13.3f}{E_wltp:>12.4f}")
     
-    print(f"\n  Duration: {t[-1] - t[0]:.0f} (s) ; mean speed: {d / (t[-1] - t[0]) * 3600:.1f} (km/h)")
+    print(f"\n  Duration: {t[-1] - t[0]:.0f} (s) ; mean speed: {d / (t[-1] - t[0]) * 3600:.1f} (km/h) ; "
+      f"maximum speed: {v_wltp.max():.1f} (km/h)")
     print(f"  Maximum battery power: {P_wltp.max() * 1e-3:.1f} (kW) ; "
-          f"maximum recovered power: {-P_wltp.min() * 1e-3:.1f} (kW)")
+      f"maximum recovered power: {-P_wltp.min() * 1e-3:.1f} (kW)")
+    # Share of the cycle where the battery delivers less than 10 kW
+    P_low = 10e3 # W
+    share = (P_wltp < P_low).mean() * 1e2 # %
+    print(f"  Battery power below {P_low * 1e-3:.0f} kW during {share:.1f} % of the cycle") 
+
+    # Mean powers over the cycle (kW): energy (kWh) / duration (h)
+    T_h = (t[-1] - t[0]) / 3600 # duration of the cycle (h)
+    print(f"  Mean battery power: out = {E_out / T_h:.2f} (kW) ; "
+      f"in = {E_in / T_h:.2f} (kW) ; net = {E_net / T_h:.2f} (kW)")
+    print(f"  Recovered / drawn: {-E_in / E_out * 1e2:.1f} %")
+
     print(f"  Energy consumption: {E_wltp:.4f} (kWh/km)")
     print(f"  Range (battery of {BATTERY_CAPACITY} kWh): {BATTERY_CAPACITY / E_wltp:.1f} (km)")
+    # Consumption at a constant speed equal to the mean speed of the cycle
+    v_mean = d / (t[-1] - t[0]) * 3600 # km/h
+    E_mean = consumption_constant_speed(car, motor, v_mean)
+    print(f"  Consumption at a constant speed of {v_mean:.1f} km/h: {E_mean:.4f} (kWh/km) ")
+    
+    
     if PLOT:
        with plt.rc_context(get_style()):
            path = "Graphs/wltp.pdf" if EXPORT else None
