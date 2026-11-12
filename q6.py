@@ -12,10 +12,11 @@ import matplotlib.pyplot as plt
 from vehicle import Vehicle
 from motor import Motor
 from constants import (KMH_TO_MS, RADS_TO_RPM, P_ACCESSORIES, 
-                       ALPHA_REGEN, P_REGEN_MAX, BATTERY_CAPACITY)
+                       ALPHA_REGEN, P_REGEN_MAX, BATTERY_CAPACITY, 
+                       P_ACCESSORIES_WINTER, P_ACCESSORIES_SUMMER)
 from resistive_forces import total_force
 from plot_style import get_style
-from plots import plot_consumption, plot_cycle
+from plots import plot_consumption, plot_cycle, plot_cycle_alpha, plot_consumption_weather
 
 PLOT = True
 EXPORT = False
@@ -68,7 +69,7 @@ def motor_operating_point(vehicle, speed, slope=0):
     
     return rpm, torque
 
-def battery_power_constant_speed(vehicle, motor, speed, slope=0):
+def battery_power_constant_speed(vehicle, motor, speed, slope=0,  P_acc=P_ACCESSORIES):
     """
     Power drawn from the battery P_bat (W) at constant speed
     (!) speed is expected in (km/h) (and slope in (%))
@@ -84,10 +85,10 @@ def battery_power_constant_speed(vehicle, motor, speed, slope=0):
     rpm, torque = motor_operating_point(vehicle, speed, slope)
     eta_m = motor_efficiency(motor, rpm, torque)
     
-    return F_t * speed_ms / (eta_tr * eta_m) + P_ACCESSORIES
+    return F_t * speed_ms / (eta_tr * eta_m) + P_acc
 
 
-def consumption_constant_speed(vehicle, motor, speed, slope=0):
+def consumption_constant_speed(vehicle, motor, speed, slope=0, P_acc=P_ACCESSORIES ):
     """
     Energy consumption E (kWh/km) at constant speed
     (!) speed is expected in (km/h) (and slope in (%))
@@ -95,7 +96,7 @@ def consumption_constant_speed(vehicle, motor, speed, slope=0):
       E = P_bat (kW) / V (km/h)
     """
     
-    P_bat = battery_power_constant_speed(vehicle, motor, speed, slope)
+    P_bat = battery_power_constant_speed(vehicle, motor, speed, slope, P_acc)
     
     return (P_bat * 1e-3) / speed
 
@@ -232,6 +233,51 @@ def main():
             k = np.argmin(E_s) # index of the smallest consumption
             print(f"  {s:>2d} % slope : E_min = {E_s[k]:.4f} (kWh/km) at V = {speed[k]:.1f} (km/h)")
 
+
+    # Influence of the weather (flat road): heating in winter, cooling in summer
+    print_section("Influence of the weather")
+    weather = {"20 °C (HVAC off)": P_ACCESSORIES,
+               "-5 °C (heating)":  P_ACCESSORIES_WINTER,
+               "35 °C (cooling)":  P_ACCESSORIES_SUMMER}
+    
+    print(f"{'V (km/h)':>10}" + "".join(f"{name:>20}" for name in weather) + "   (kWh/km)")
+    print("-" * 82)
+    
+    for v in speeds:
+        print(f"{v:>10d}" + "".join(
+            f"{consumption_constant_speed(car, motor, v, P_acc=P):>20.4f}" 
+            for P in weather.values()))
+    
+    speed = np.linspace(5, 150, 1000) # km/h
+    E_weather = [consumption_constant_speed(car, motor, speed, P_acc=P) 
+                 for P in weather.values()]
+    
+    # Ratio with respect to the consumption at 20 °C
+    print("\nRatio with respect to 20 °C:")
+    for v in speeds:
+        E_ref = consumption_constant_speed(car, motor, v)
+        ratio_winter = consumption_constant_speed(car, motor, v, P_acc=P_ACCESSORIES_WINTER) / E_ref
+        ratio_summer = consumption_constant_speed(car, motor, v, P_acc=P_ACCESSORIES_SUMMER) / E_ref
+        print(f"  {v:>3d} km/h : winter x {ratio_winter:.2f} (+{(ratio_winter - 1) * 1e2:.0f} %) ; "
+              f"summer x {ratio_summer:.2f} (+{(ratio_summer - 1) * 1e2:.0f} %)")
+        
+    
+    print("\nMinimum energy consumption:")
+    for name, E_w in zip(weather, E_weather):
+        k = np.argmin(E_w)
+        print(f"  {name:>18} : E_min = {E_w[k]:.4f} (kWh/km) at V = {speed[k]:.1f} (km/h)")
+    
+    if PLOT:
+        with plt.rc_context(get_style()):
+            path = "Graphs/consumption_weather.pdf" if EXPORT else None
+            plot_consumption_weather(speed, E_weather, list(weather), points=speeds, 
+                                     ymax=1.2, export_path=path)
+        plt.show()
+    
+    
+    
+    
+    
      # c. WLTP driving cycle
     print_section("WLTP driving cycle")
     t, v_wltp, phase = load_wltp(WLTP_FILE)
@@ -274,17 +320,58 @@ def main():
 
     print(f"  Energy consumption: {E_wltp:.4f} (kWh/km)")
     print(f"  Range (battery of {BATTERY_CAPACITY} kWh): {BATTERY_CAPACITY / E_wltp:.1f} (km)")
+    print(f"  Range (usable capacity of 18.8 kWh): {18.8 / E_wltp:.1f} (km)")
     # Consumption at a constant speed equal to the mean speed of the cycle
     v_mean = d / (t[-1] - t[0]) * 3600 # km/h
     E_mean = consumption_constant_speed(car, motor, v_mean)
     print(f"  Consumption at a constant speed of {v_mean:.1f} km/h: {E_mean:.4f} (kWh/km) ")
     
     
+    
+    
+    # Effect of the braking energy recovery coefficient alpha
+    print_section("Influence of alpha")
+    weather = {"20 °C (HVAC off)": P_ACCESSORIES,
+               "-5 °C (heating)":  P_ACCESSORIES_WINTER,
+               "35 °C (cooling)":  P_ACCESSORIES_SUMMER}
+    
+    print(f"{'V (km/h)':>10}" + "".join(f"{name:>20}" for name in weather) + "   (kWh/km)")
+    print("-" * 82)
+    
+    print("\n  Effect of alpha:")
+    print(f"{'alpha':>8}{'P_in (kW)':>12}{'P_net (kW)':>12}{'E (kWh/km)':>13}"
+      f"{'Variation (%)':>15}{'Range (km)':>12}")
+    alphas = [0.3, 0.4, 0.5]
+    P_alphas = []
+    T_h = (t[-1] - t[0]) / 3600 # duration of the cycle (h)
+
+    for alpha in alphas:
+        P_a = battery_power_cycle(car, motor, t, v_wltp, alpha=alpha)
+        P_alphas.append(P_a)
+        d_a, E_out_a, E_in_a = cycle_energy(t, v_wltp, P_a)
+        E_a = (E_out_a + E_in_a) / d_a # kWh/km
+        print(f"{alpha:>8.1f}{E_in_a / T_h:>12.2f}{(E_out_a + E_in_a) / T_h:>12.2f}{E_a:>13.4f}"
+          f"{(E_a / E_wltp - 1) * 1e2:>15.2f}{BATTERY_CAPACITY / E_a:>12.1f}")
+    
+    # Strongest braking between 1300 and 1500 s: recovered power for each alpha
+    window = (t >= 1300) & (t <= 1500)
+    k = np.argmin(np.where(window, P_alphas[0], np.inf))
+    t_mark = t[k]
+
+    print(f"\n  Strongest braking of the window, at t = {t_mark:.0f} (s):")
+    for alpha, P_a in zip(alphas, P_alphas):
+        print(f"    alpha = {alpha:.1f} : P_bat = {P_a[k] * 1e-3:.1f} (kW)")
+   
+    
+   
+        
     if PLOT:
        with plt.rc_context(get_style()):
            path = "Graphs/wltp.pdf" if EXPORT else None
            phase_plot = np.where(phase == "Middle", "Medium", phase) 
            plot_cycle(t, v_wltp, P_wltp, phase=phase_plot, export_path=path)
+           path = "Graphs/wltp_alpha.pdf" if EXPORT else None
+           plot_cycle_alpha(t, P_alphas, alphas, xlim=(1300, 1500), t_mark=t_mark, export_path=path)
        plt.show()
     return
 
