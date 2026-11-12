@@ -1180,6 +1180,137 @@ def plot_cycle(t, speed, P_bat, phase=None, export_path=None):
     return fig1, fig2
 
 
+def plot_cycle_alpha(t, P_bats, alphas, xlim=None, t_mark=None, export_path=None):
+    """
+    Plots the battery power along a driving cycle for different braking 
+    energy recovery coefficients alpha.
+    t in (s), P_bats: list of battery powers (W), one per alpha
+    xlim: time window to show (t_min, t_max) in (s), None = whole cycle
+    t_mark: time (s) at which the recovered powers are marked with a dot
+    """
+    
+    fig, ax = plt.subplots()
+    
+    # 1800 points: thinner lines than in the other plots
+    lw = plt.rcParams["lines.linewidth"] / 3
+    
+    # Power drawn from the battery (same for all alpha)
+    P_kW = P_bats[0] * 1e-3
+    ax.plot(t, np.where(P_kW > 0, P_kW, 0), color="tab:purple", lw=lw,
+            label=r"$\mathcal{P}_\mathsf{bat}^\mathsf{out}$")
+    
+    # Recovered power: largest alpha first, so that all the curves stay visible
+    colors = ["tab:red", "tab:orange", "tab:cyan"]
+    
+    for P_bat, alpha, color in list(zip(P_bats, alphas, colors))[::-1]:
+        P_kW = P_bat * 1e-3
+        ax.plot(t, np.where(P_kW < 0, P_kW, 0), color=color, lw=lw,
+                label=rf"$\mathcal{{P}}_\mathsf{{bat}}^\mathsf{{in}}$: $\alpha$ = {alpha}")
+    
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Battery power (kW)")
+    
+    # Time window, and the part of the powers that is visible in it
+    # Time window, and the part of the powers that is visible in it
+    if xlim is None:
+        xlim = (t.min(), t.max())
+        ax.xaxis.set_major_locator(MultipleLocator(300))
+    else:
+        # graduations every 50 s for a short window, every 100 s for a longer one
+        step = 50 if xlim[1] - xlim[0] <= 300 else 100
+        ax.xaxis.set_major_locator(MultipleLocator(step))
+    
+    ax.set_xlim(xlim)
+    visible = (t >= xlim[0]) & (t <= xlim[1])
+    P_visible = np.array(P_bats)[:, visible] * 1e-3
+    
+    # y axis: just above the highest visible power, and a small margin below 
+    # the lowest one (graduations every 10 kW: the last one written is -10)
+    y_top = np.ceil(P_visible.max() / 10) * 10
+    y_bottom = P_visible.min() - 2
+    ax.set_ylim(y_bottom, y_top)
+    ax.yaxis.set_major_locator(MultipleLocator(10))
+    ax.grid()
+    
+    # legend: P_out, then the recovered powers by increasing alpha
+    handles, labels = ax.get_legend_handles_labels()
+    order = [0] + list(range(len(handles) - 1, 0, -1))
+    handles = [handles[k] for k in order]
+    labels = [labels[k] for k in order]
+    
+    # Recovered powers at t_mark: one coloured dot per curve, 
+    # with its value in the second column of the legend
+    if t_mark is not None:
+        k = np.argmin(np.abs(t - t_mark))
+        
+        # title of the second column (no symbol in front of it)
+        handles.append(Line2D([], [], linestyle=""))
+        labels.append(f"At t = {t[k]:.0f} s:")
+        
+        for P_bat, color in zip(P_bats, colors):
+            dot = ax.scatter(t[k], P_bat[k] * 1e-3, color=color, zorder=4,
+                             s=(plt.rcParams["lines.markersize"] / 2.5) ** 2)
+            handles.append(dot)
+            labels.append(f"{P_bat[k] * 1e-3:.1f} kW")
+    
+    # Same trick as the other plots to keep the axes size
+    w, h = fig.get_size_inches()
+    
+    fig.legend(handles, labels, loc="outside lower center", ncol=2)
+    fig.get_layout_engine().set(h_pad=0.2)
+    ax.set_box_aspect(h / w)
+    
+    if export_path:
+        fig.savefig(export_path, dpi=300, bbox_inches="tight")
+    
+    return fig
+
+
+
+
+def plot_consumption_weather(speed, consumptions, labels, points=None, ymax=None, export_path=None):
+    """
+    Plots the energy consumption at constant speed against the speed,
+    for different weather conditions (accessories power).
+    speed in (km/h), consumptions: list of curves in (kWh/km), one per label
+    points: speeds (km/h) to highlight on each curve
+    ymax: upper limit of the consumption axis (None = automatic)
+    """
+    
+    fig, ax = plt.subplots()
+    
+    colors = ["tab:purple", "tab:cyan", "tab:orange"]
+    
+    for E, label, color in zip(consumptions, labels, colors):
+        
+        ax.plot(speed, E, color=color, label=label)
+        
+        if points is not None:
+            ax.scatter(points, np.interp(points, speed, E), zorder=3, color="red",
+                       label="30, 50, 90 and 120 km/h" if label == labels[-1] else None)
+    
+    # Style
+    ax.set_xlabel(r"Speed (km/h)")
+    ax.set_ylabel(r"Energy consumption (kWh/km)")
+    ax.grid()
+    
+    # Same trick as the other plots to keep the axes size
+    w, h = fig.get_size_inches()
+    
+    fig.legend(loc="outside lower center", ncol=2)
+    fig.get_layout_engine().set(h_pad=0.2)
+    
+    ax.set_box_aspect(h / w)
+    
+    ax.set_ylim(0, ymax)
+    ax.set_xlim(0, speed.max())
+    ticks = np.arange(0, speed.max() + 1, 15)
+    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    
+    if export_path:
+        fig.savefig(export_path, dpi=300, bbox_inches="tight")
+    
+    return fig
 
 
 
