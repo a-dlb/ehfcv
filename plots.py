@@ -14,6 +14,7 @@ from matplotlib.lines import Line2D
 from pathlib import Path
 from constants import RADS_TO_RPM, KMH_TO_MS
 from resistive_forces import total_force, total_power, drag_force, grading_force, rolling_res_force, net_force
+from consumption import motor_efficiency
 
 def plot_resistive_force(vehicle, slopes, decompose=True, export_path=None):
     """
@@ -1320,6 +1321,52 @@ def plot_consumption_weather(speed, consumptions, labels, points=None, ymax=None
     
     return fig
 
+# Function developed with the assistance of Claude Sonnet 5.5
+# (Anthropic, 2026).
+def plot_efficiency_map(motor, rpm_max, mirror=False,
+                        n=200, levels=None, export_path=None):
+    """
+    Efficiency map eta_m(N, T) limited by the max torque curve motor.torque(rpm),
+    with contour lines and a colorbar.
 
+    mirror=True also plots the negative-torque half (generator mode).
+    """
+    rpm = np.linspace(0, rpm_max, n)
+    t_max = np.asarray(motor.torque(rpm))          # max torque curve (Nm)
 
+    torque = np.linspace(-t_max.max() if mirror else 0, t_max.max(), n)
+    N, T = np.meshgrid(rpm, torque)
+
+    eta = motor_efficiency(motor, N, np.abs(T))
+    # Mask everything beyond the torque limit (broadcast t_max along the rows)
+    eta = np.ma.masked_where(np.abs(T) > t_max[None, :], eta)
+
+    if levels is None:
+        levels = np.linspace(eta.min(), eta.max(), 12)
+
+    fig, ax = plt.subplots()
+    ax.set_box_aspect(1.4 if mirror else 0.7)
+    cf = ax.contourf(N, T, eta, levels=levels, cmap="jet")
+    cs = ax.contour(N, T, eta, levels=levels, colors="k", linewidths=1)
+    ax.clabel(cs, fmt="%.2f", fontsize=18)
+
+    # Torque limit curve
+    ax.plot(rpm, t_max, color="k")
+    if mirror:
+        ax.plot(rpm, -t_max, color="k")
+
+    fig.colorbar(cf, ax=ax, label=r"$\eta_m$ (-)")
+    ax.set_xlabel(r"Motor speed (10$^3$ rpm)")
+    ax.set_ylabel("Torque (Nm)")
+    
+    ticks = np.append(np.arange(0, 11001, 1000), rpm.max())
+    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    ax.xaxis.set_major_formatter(
+        FuncFormatter(lambda x, _: f"{x/1000:g}" if x != 11000 else ""))
+    ax.yaxis.set_major_locator(MultipleLocator(50))
+
+    if export_path is not None:
+        fig.savefig(export_path)
+
+    return fig, ax
 
