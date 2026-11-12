@@ -510,4 +510,134 @@ def plot_power(vehicle, motor, slopes, export_path=None):
     if export_path:
         fig.savefig(export_path, dpi=300, bbox_inches="tight")
     
+    return fig 
+
+
+def plot_consumption(speed, consumptions, slopes, points=None, export_path=None):
+    """
+    Plots the energy consumption at constant speed against the speed,
+    for different slopes.
+ 
+    Parameters
+    ----------
+    speed : np.ndarray
+        The speeds (in km/h)
+    consumptions : list of np.ndarray
+        The energy consumption curves (in kWh/km), one per slope
+    slopes : list
+        The slopes (in %) corresponding to the curves
+    points : np.ndarray, optional
+        Specific speeds (in km/h) to highlight on each curve. The default is None.
+    export_path : string, optional
+        If export, specify the path. The default is None.
+ 
+    Returns
+    -------
+    plt.fig
+        The plot!
+    """
+    
+    fig, ax = plt.subplots()
+    
+    colors = ["tab:purple", "tab:cyan", "tab:orange"]
+    
+    for E, slope, color in zip(consumptions, slopes, colors):
+        
+        ax.plot(speed, E, color=color, label=f"{slope} % slope")
+        
+        if points is not None:
+            ax.scatter(points, np.interp(points, speed, E), zorder=3, color="red",
+                       label="30, 50, 90 and 120 km/h" if slope == slopes[-1] else None)
+    
+    # Style
+    ax.set_xlabel(r"Speed (km/h)")
+    ax.set_ylabel(r"Energy consumption (kWh/km)")
+    ax.grid()
+    
+    # Same trick as the other plots to keep the axes size
+    w, h = fig.get_size_inches()
+    
+    fig.legend(loc="outside lower center", ncol=2)
+    fig.get_layout_engine().set(h_pad=0.2)
+    
+    ax.set_box_aspect(h / w)
+    
+    ax.set_ylim(bottom=0)
+    ax.set_xlim(0, speed.max())
+    ticks = np.arange(0, speed.max() + 1, 15)
+    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    
+    if export_path:
+        fig.savefig(export_path, dpi=300, bbox_inches="tight")
+    
     return fig
+
+
+
+def plot_cycle(t, speed, P_bat, phase=None, export_path=None):
+    """
+    Plots a driving cycle in two separate figures: 
+    vehicle speed against time, and battery power against time.
+    t in (s), speed in (km/h), P_bat in (W)
+    (P_bat > 0: drawn from the battery, < 0: recovered by braking)
+    
+    If export_path is given (e.g. "Graphs/wltp.pdf"), the figures are saved
+    as "Graphs/wltp_speed.pdf" and "Graphs/wltp_power.pdf".
+    """
+    
+    lw = plt.rcParams["lines.linewidth"] / 2
+    
+    # Figure 1: speed
+    fig1, ax1 = plt.subplots()
+    ax1.plot(t, speed, color="tab:purple",lw=lw)
+    ax1.set_xlabel("Time (s)")
+    ax1.set_ylabel("Speed (km/h)")
+    ax1.set_xlim(t.min(), t.max())
+    ax1.set_ylim(bottom=0)
+    ax1.xaxis.set_major_locator(MultipleLocator(300))
+    ax1.grid()
+    if phase is not None:
+    
+        ax1.set_ylim(top=speed.max() * 1.15) 
+        names, first = np.unique(phase, return_index=True)  # names of the phases, in the order of the cycle
+        names = names[np.argsort(first)]
+    
+    for name in names:
+        t_phase = t[phase == name]
+        if t_phase.min() > t.min():
+            ax1.axvline(t_phase.min(), color="black", ls="--", lw=lw)
+        ax1.text(t_phase.mean(), speed.max() * 1.07, name, 
+                 ha="center", va="center", fontweight="bold",
+                 fontsize=plt.rcParams["legend.fontsize"])
+    
+    # Figure 2: battery power
+    P_kW = P_bat * 1e-3
+    
+    fig2, ax2 = plt.subplots()
+    ax2.plot(t, np.where(P_kW > 0, P_kW, 0), color="tab:purple", lw=lw,
+             label=r"$\mathcal{P}_\mathsf{bat}^\mathsf{out}$")
+    ax2.plot(t, np.where(P_kW < 0, P_kW, 0), color="tab:cyan", lw=lw,
+             label=r"$\mathcal{P}_\mathsf{bat}^\mathsf{in}$")
+    ax2.set_xlabel("Time (s)")
+    ax2.set_ylabel("Battery power (kW)")
+    ax2.set_xlim(t.min(), t.max())
+    ax2.xaxis.set_major_locator(MultipleLocator(300))
+    ax2.grid()
+    ax2.set_ylim(np.floor(P_kW.min() / 10) * 10, np.ceil(P_kW.max() / 10) * 10)
+    ax2.yaxis.set_major_locator(MultipleLocator(10))
+    ax2.legend(loc="upper left")
+    
+    if export_path:
+        path = Path(export_path)
+        fig1.savefig(path.with_name(f"{path.stem}_speed{path.suffix}"), 
+                     dpi=300, bbox_inches="tight")
+        fig2.savefig(path.with_name(f"{path.stem}_power{path.suffix}"), 
+                     dpi=300, bbox_inches="tight")
+    
+    return fig1, fig2
+
+
+
+
+
+
