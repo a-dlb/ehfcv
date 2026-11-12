@@ -1332,7 +1332,7 @@ def plot_efficiency_map(motor, rpm_max, mirror=False,
 
     mirror=True also plots the negative-torque half (generator mode).
     """
-    rpm = np.linspace(0, rpm_max, n)
+    rpm = np.linspace(1e-6, rpm_max, n)
     t_max = np.asarray(motor.torque(rpm))          # max torque curve (Nm)
 
     torque = np.linspace(-t_max.max() if mirror else 0, t_max.max(), n)
@@ -1368,7 +1368,7 @@ def plot_efficiency_map(motor, rpm_max, mirror=False,
     ax.yaxis.set_major_locator(MultipleLocator(50))
 
     if export_path is not None:
-        fig.savefig(export_path)
+        fig.savefig(export_path, bbox_inches="tight")
 
     return fig, ax
 
