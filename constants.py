@@ -16,3 +16,9 @@ RADS_TO_RPM = 60 / (2 * np.pi) # rpm/rad
 MS_TO_KMH = 3.6 # (km/h)/(m/s)
 KMH_TO_MS = 1/3.6 # (m/s)/(km/h)
 RHO_AIR = 1.23 # kg/m^3
+
+
+P_ACCESSORIES = 200 # W (power consumed by the accessories)
+ALPHA_REGEN = 0.3   # - (braking energy recovery coefficient)
+P_REGEN_MAX = 50e3  # W (maximum regenerative braking power)
+BATTERY_CAPACITY = 22.6 # kWh (gross)
