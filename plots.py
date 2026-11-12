@@ -374,6 +374,12 @@ def plot_acc_capa(vehicle, motor, speed, slopes, highlight="peak", export_path=T
 
 
 def plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redline, k_oc, v_max, highlight, export_path=None):
+    """
+    Plots the resistive and tractive powers as a function of the speed of the vehicle.
+    Plots the actual and theoretical greatest top speeds accordingly.
+    /!\ speeds are expected in (km/h), powers in (W))
+    """
+    
     
     alpha_peak = 1.0 if highlight == "peak" else 0.3
     alpha_nom = 1.0 if highlight == "nom" else 0.3
@@ -485,6 +491,8 @@ def plot_topspeed(speed, eta_tr, P_max, wheel_power, resistive_power, under_redl
     return fig
 
 
+# Function developed with the assistance of Claude Sonnet 5.5
+# (Anthropic, 2026).
 def plot_max_slopes(data, powers, export_path=None):
     """
     Max slope for different mu and both power regimes
