@@ -18,7 +18,10 @@ KMH_TO_MS = 1/3.6 # (m/s)/(km/h)
 RHO_AIR = 1.23 # kg/m^3
 
 
-P_ACCESSORIES = 200 # W (power consumed by the accessories)
-ALPHA_REGEN = 0.3   # - (braking energy recovery coefficient)
-P_REGEN_MAX = 50e3  # W (maximum regenerative braking power)
-BATTERY_CAPACITY = 22.6 # kWh (gross)
+P_ACCESSORIES = 200 # W 
+ALPHA_REGEN = 0.3   # - 
+P_REGEN_MAX = 50e3  # W 
+BATTERY_CAPACITY = 22.6 # kWh 
+
+P_ACCESSORIES_WINTER = 4342.86 # W 
+P_ACCESSORIES_SUMMER = 5700 # W 
