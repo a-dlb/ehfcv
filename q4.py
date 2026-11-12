@@ -16,7 +16,7 @@ from resistive_forces import grading_force, net_force
 from constants import KMH_TO_MS, RADS_TO_RPM
 
 PLOT = True
-EXPORT = True
+EXPORT = False
 
 def main():
     

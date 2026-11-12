@@ -1321,6 +1321,7 @@ def plot_consumption_weather(speed, consumptions, labels, points=None, ymax=None
     
     return fig
 
+
 # Function developed with the assistance of Claude Sonnet 5.5
 # (Anthropic, 2026).
 def plot_efficiency_map(motor, rpm_max, mirror=False,
@@ -1355,7 +1356,8 @@ def plot_efficiency_map(motor, rpm_max, mirror=False,
     if mirror:
         ax.plot(rpm, -t_max, color="k")
 
-    fig.colorbar(cf, ax=ax, label=r"$\eta_m$ (-)")
+    cax = ax.inset_axes([1.03, 0, 0.04, 1])   # [x0, y0, width, height] in axes fraction
+    fig.colorbar(cf, cax=cax, label=r"$\eta_m$ (-)")
     ax.set_xlabel(r"Motor speed (10$^3$ rpm)")
     ax.set_ylabel("Torque (Nm)")
     
