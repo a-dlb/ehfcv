@@ -21,6 +21,12 @@ class Motor:
     rotor_rad_ext: float = 178.6e-3/2   # m 
     rotor_rad_int: float = 130e-3/2     # m
     rotor_inertia: float = 69138e-6     # kg.m^2 
+    eff_coeffs: tuple = (8.079e-1,      # C0..C5 of the efficiency map  
+                         1.827e-5,      # 1/rpm
+                         6.760e-4,      # 1/Nm
+                         -1.087e-9,     # 1/rpm^2
+                         2.434e-9,      # 1/rpm/Nm
+                         -1.864e-6)     # 1/Nm^2
     
     @property
     def overcharging_factor(self):
