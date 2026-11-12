@@ -14,7 +14,7 @@ from plot_style import get_style
 from plots import plot_torque_power, plot_traction, plot_power
 
 PLOT = True
-EXPORT = False
+EXPORT = True
 
 def main():
     

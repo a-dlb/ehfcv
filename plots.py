@@ -13,7 +13,134 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from pathlib import Path
 from constants import RADS_TO_RPM, KMH_TO_MS
-from resistive_forces import total_force, total_power
+from resistive_forces import total_force, total_power, drag_force, grading_force, rolling_res_force, net_force
+
+def plot_resistive_force(vehicle, slopes, decompose=True, export_path=None):
+    """
+    Plot the resistive forces as a function of the speed of the vehicle 
+    slope. Plots every contribution and the total force.
+
+    Parameters
+    ----------
+    vehicle : Vehicle()
+        The vehicle to take into account.
+    slopes : np.array
+        Slopes to consider, in (%).
+    export_path : string, optional
+        If export, specify the path. The default is None.
+
+    Returns
+    -------
+    list(plt.fig)
+        The plots!
+    """
+    
+    speed = np.linspace(1e-6, vehicle.max_speed, 1000) # km/h
+
+    figs = []
+        
+    
+    def crossing(V_kmh, f1, f2):
+        """First speed (km/h) where f1 surpasses f2, None if not in the span."""
+        d = f1 - f2
+        idx = np.where(np.diff(np.sign(d)) != 0)[0]
+        if len(idx) == 0:
+            return None
+        i = idx[0]
+        # linear interpolation between the two points
+        return V_kmh[i] - d[i] * (V_kmh[i+1] - V_kmh[i]) / (d[i+1] - d[i])
+    
+    
+    for s in slopes:
+        
+        fig, ax = plt.subplots()
+        
+        F_aero  = drag_force(vehicle, speed)
+        F_roll  = rolling_res_force(vehicle, speed, s)
+        F_grade = grading_force(vehicle, s) # returns a scalar
+        F_grade = np.full_like(speed, F_grade)
+        F_tot   = total_force(vehicle, speed, s)
+    
+
+        ax.plot(speed, F_aero,  color="tab:green",  label="Aerodynamic drag")
+        ax.plot(speed, F_roll,  color="tab:orange",    label="Rolling resistance")
+        ax.plot(speed, F_grade, color="tab:pink", label=f"Grading resistance ({s:.0f} %)")
+        ax.plot(speed, F_tot,   color="tab:blue",   label="Total resistance")
+    
+        # V1 : drag = rolling ; V2 : drag = grading (si dans la plage de vitesse)
+        V1 = crossing(speed, F_aero, F_roll)
+        if V1 is not None:
+            ax.plot(V1, np.interp(V1, speed, F_roll), "o", color="black",
+                    markersize=15, zorder=5, label=rf"$V_1$ = {V1:.1f} km/h")
+        if s > 0:
+            V2 = crossing(speed, F_aero, F_grade)
+            if V2 is not None:
+                ax.plot(V2, np.interp(V2, speed, F_grade), "o", color="tab:brown",
+                        markersize=15, zorder=5, label=rf"$V_2$ = {V2:.1f} km/h")
+    
+        ax.set_xlabel("Speed (km/h)")
+        ax.set_ylabel("Resistance force (N)")
+        ax.set_xlim(0, vehicle.max_speed)
+        ax.set_ylim(bottom=-4)
+        
+        legend_kw = dict(loc="upper left", framealpha=0.9)
+        ax.legend(**legend_kw)
+        
+        ax.grid(True)
+        
+        figs.append(fig)
+        
+        if export_path:
+            fig.savefig(export_path + f"_{s}percent.pdf", dpi=300)
+        
+    return figs
+
+
+def plot_resistive_power(vehicle, slopes, export_path=None):
+    """
+    Plot the  total resistive power as a function of the speed of the vehicle 
+    and slope.
+
+    Parameters
+    ----------
+    vehicle : Vehicle()
+        The vehicle to take into account.
+    slopes : np.array
+        Slopes to consider, in (%).
+    export_path : string, optional
+        If export, specify the path. The default is None.
+
+    Returns
+    -------
+    plt.fig
+        The plot!
+    """
+    
+    speed = np.linspace(1e-6, vehicle.max_speed, 1000) # km/h
+    
+    fig, ax = plt.subplots()
+        
+    for s in slopes:
+        
+        P = total_power(vehicle, speed, s)
+        label = f"slope {s:.0f} %"
+        ax.plot(speed, P / 1000, label=label)     
+    
+    ax.set_xlabel("Speed (km/h)")
+    ax.set_ylabel(r"$P_{road}$ (kW)")
+    ax.set_xlim(0, vehicle.max_speed)
+    ax.set_ylim(bottom=0)
+    
+    ax.grid(True)
+    
+    legend_kw = dict(loc="upper left", framealpha=0.9)
+    ax.legend(**legend_kw)
+        
+    if export_path:
+        fig.savefig(export_path, dpi=300)
+    
+    return fig
+
 
 def plot_torque_power(rpm, C_peak, P_peak, k_oc, highlight="peak", export_path=None):
     """
@@ -52,6 +179,197 @@ def plot_torque_power(rpm, C_peak, P_peak, k_oc, highlight="peak", export_path=N
     if export_path:
         fig.savefig(export_path, dpi=300)
         
+    return fig
+
+
+def plot_netforce(vehicle, motor, speed, slopes, highlight="peak", export_path=True):
+    """
+    Plots the net force as a function of the speed an the slopes.
+
+    Parameters
+    ----------
+    vehicle : Vehicle()
+        The vehicle to take into account.
+    motor : Motor()
+        The motor in the vehicle.
+    speed : np.ndarray
+        The speeds to consider (in km/h).
+    slopes : np.ndarray
+        The slopes for the grading force (in %)
+    highlight : string, optional
+        Which power mode to put in evidence. The default is "peak".
+    export_path : string, optional
+        If export, specify the path. The default is None.
+
+    Returns
+    -------
+    plt.fig
+        The plot!
+    """
+    
+    
+    alpha_peak = 1.0 if highlight == "peak" else 0.3
+    alpha_nom = 1.0 if highlight == "nom" else 0.3
+    
+    fig, ax = plt.subplots()
+    
+    for s in slopes:
+        
+        F_net_peak = net_force(vehicle, motor, speed, s, power="peak")
+        F_net_nom = net_force(vehicle, motor, speed, s, power="nom")
+        
+        ax.plot(speed, F_net_peak, label=f"slope {s} %" if highlight=="peak" else None, alpha=alpha_peak)
+        ax.plot(speed, F_net_nom, label=f"slope {s} %" if highlight=="nom" else None, alpha=alpha_nom)
+    
+    ax.set_ylabel(r"$F_{net}$ (N)")
+    
+    rpm_base = motor.base_speed_rpm
+    R_e = vehicle.tire_effective_radius_rear
+    i_red = vehicle.gear_ratio
+    V_base_kmh = rpm_base * 2*np.pi/60 * R_e / i_red * 3.6
+    
+    ax.axvline(V_base_kmh, color="grey", linestyle="--", linewidth=3)
+    ax.axhline(0, color="black", linewidth=1.5)
+    ax.set_xlabel("Speed (km/h)")
+    ax.set_xlim(0, vehicle.max_speed)
+    ax.set_ylim(bottom=-1000)
+    ax.grid(True)
+    ax.legend(loc="upper right", framealpha=0.9)
+    
+    if export_path:
+        fig.savefig(export_path, dpi=300)
+    
+    return fig
+
+
+def plot_acc(vehicle, motor, speed, slopes, highlight="peak", export_path=True):
+    """
+    Plots the acceleration as a function of the speed an the slopes.
+
+    Parameters
+    ----------
+    vehicle : Vehicle()
+        The vehicle to take into account.
+    motor : Motor()
+        The motor in the vehicle.
+    speed : np.ndarray
+        The speeds to consider (in km/h).
+    slopes : np.ndarray
+        The slopes for the grading force (in %)
+    highlight : string, optional
+        Which power mode to put in evidence. The default is "peak".
+    export_path : string, optional
+        If export, specify the path. The default is None.
+
+    Returns
+    -------
+    plt.fig
+        The plot!
+    """
+    
+    
+    alpha_peak = 1.0 if highlight == "peak" else 0.3
+    alpha_nom = 1.0 if highlight == "nom" else 0.3
+    
+    m_et = vehicle.total_effective_mass(motor)
+    
+    fig, ax = plt.subplots()
+    
+    for s in slopes:
+        
+        a_x_peak = net_force(vehicle, motor, speed, s, power="peak") / m_et
+        a_x_nom = net_force(vehicle, motor, speed, s, power="nom") / m_et
+        
+        ax.plot(speed, a_x_peak, label=f"slope {s} %" if highlight=="peak" else None, alpha=alpha_peak)
+        ax.plot(speed, a_x_nom, label=f"slope {s} %" if highlight=="nom" else None, alpha=alpha_nom)
+    
+    ax.set_ylabel(r"$a_x$ (m/s$^2$)")
+    
+    rpm_base = motor.base_speed_rpm
+    R_e = vehicle.tire_effective_radius_rear
+    i_red = vehicle.gear_ratio
+    V_base_kmh = rpm_base * 2*np.pi/60 * R_e / i_red * 3.6
+    
+    ax.axvline(V_base_kmh, color="grey", linestyle="--", linewidth=3)
+    ax.axhline(0, color="black", linewidth=1.5)
+    ax.set_xlabel("Speed (km/h)")
+    ax.set_xlim(0, vehicle.max_speed)
+    ax.set_ylim(bottom=-1)
+    ax.grid(True)
+    ax.legend(loc="upper right", framealpha=0.9)
+    
+    if export_path:
+        fig.savefig(export_path, dpi=300)
+    
+    return fig
+
+
+def plot_acc_capa(vehicle, motor, speed, slopes, highlight="peak", export_path=True):
+    """
+    Plots the acceleration capability as a function of the speed an the slopes.
+
+    Parameters
+    ----------
+    vehicle : Vehicle()
+        The vehicle to take into account.
+    motor : Motor()
+        The motor in the vehicle.
+    speed : np.ndarray
+        The speeds to consider (in km/h).
+    slopes : np.ndarray
+        The slopes for the grading force (in %)
+    highlight : string, optional
+        Which power mode to put in evidence. The default is "peak".
+    export_path : string, optional
+        If export, specify the path. The default is None.
+
+    Returns
+    -------
+    plt.fig
+        The plot!
+    """
+    
+    
+    alpha_peak = 1.0 if highlight == "peak" else 0.3
+    alpha_nom = 1.0 if highlight == "nom" else 0.3
+    
+    m_et = vehicle.total_effective_mass(motor)
+    
+    fig, ax = plt.subplots()
+    
+    for s in slopes:
+        
+        a_x_peak = net_force(vehicle, motor, speed, s, power="peak") / m_et
+        a_x_nom = net_force(vehicle, motor, speed, s, power="nom") / m_et
+        
+        # Mask when it goes to infty
+        a_x_peak = np.where(a_x_peak > 0, a_x_peak, np.nan)
+        a_x_nom  = np.where(a_x_nom  > 0, a_x_nom,  np.nan)
+        
+        acc_capa_peak = 1/a_x_peak
+        acc_capa_nom = 1/a_x_nom
+        
+        ax.plot(speed, acc_capa_peak, label=f"slope {s} %" if highlight=="peak" else None, alpha=alpha_peak)
+        ax.plot(speed, acc_capa_nom, label=f"slope {s} %" if highlight=="nom" else None, alpha=alpha_nom)
+    
+    ax.set_ylabel(r"$1/a_x$ (s$^2$/m)")
+    
+    rpm_base = motor.base_speed_rpm
+    R_e = vehicle.tire_effective_radius_rear
+    i_red = vehicle.gear_ratio
+    V_base_kmh = rpm_base * 2*np.pi/60 * R_e / i_red * 3.6
+    
+    ax.axvline(V_base_kmh, color="grey", linestyle="--", linewidth=3)
+    ax.axhline(0, color="black", linewidth=1.5)
+    ax.set_xlabel("Speed (km/h)")
+    ax.set_xlim(0, vehicle.max_speed)
+    ax.set_ylim(0, 2)
+    ax.grid(True)
+    ax.legend(loc="upper right", framealpha=0.9)
+    
+    if export_path:
+        fig.savefig(export_path, dpi=300)
+    
     return fig
 
 
@@ -292,11 +610,11 @@ def plot_max_slopes(data, powers, export_path=None):
         ax.grid(axis="y", alpha=0.3, zorder=0)
 
         handles = [Patch(facecolor="lightgray", edgecolor="gray",
-                         label=r"Max slope limited by adherence $\theta_\mathsf{{max}}^{(a)}$")]
+                         label=r"Max slope limited by adherence $\theta_\mathsf{adh}$")]
         handles += [Patch(facecolor=colors[p], label=rf"Effective max slope $\theta_\mathsf{{max}}$ ({p})")
                     for p in powers]
         handles += [Line2D([0], [0], color=colors[p], ls="--",
-                           label=rf"Max slope limited by traction $\theta_\mathsf{{max}}^{{(t)}}$ ({p})")
+                           label=rf"Max slope limited by traction $\theta_\mathsf{{trac}}$ ({p})")
                     for p in powers]
         handles += [Line2D([], [], linestyle="", label="(adh) or (trac) = effective limiting factor")]
         
@@ -389,7 +707,7 @@ def plot_traction(vehicle, motor, slopes, export_path=None):
     # this is required for a little trick after drawing the legend
     w, h = fig.get_size_inches()
     
-    fs = plt.rcParams["legend.fontsize"] + 2
+    fs = plt.rcParams["legend.fontsize"] - 2
     fig.legend(loc="outside lower center", ncol=2, fontsize=fs)
     fig.get_layout_engine().set(h_pad=0.2)
     
@@ -492,7 +810,232 @@ def plot_power(vehicle, motor, slopes, export_path=None):
     # this is required for a little trick after drawing the legend
     w, h = fig.get_size_inches()
     
-    fs = plt.rcParams["legend.fontsize"] + 2
+    fs = plt.rcParams["legend.fontsize"] - 2
+    fig.legend(loc="outside lower center", ncol=2, fontsize=fs)
+    fig.get_layout_engine().set(h_pad=0.2)
+    
+    # Now we apply the box aspect given by the style dict
+    ax.set_box_aspect(h / w)
+    
+    ax.set_ylim(0, 150)
+    ticks = np.arange(0, 151, 25)
+    ax.yaxis.set_major_locator(FixedLocator(ticks))
+    
+    ax.set_xlim(0, vehicle.max_speed)
+    ticks = np.arange(0, vehicle.max_speed+1, 15)
+    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    
+    if export_path:
+        fig.savefig(export_path, dpi=300, bbox_inches="tight")
+    
+    return fig
+
+
+def plot_traction_opti(vehicle, motor, slopes, i_dict, export_path=None):
+    """
+    Plots tractive forces, resistive forces against the speed and 
+    their possible intersections, with different gear ratios
+    for peak and nominal power regimes.
+
+    Parameters
+    ----------
+    vehicle : Vehicle()
+        The vehicle to take into account.
+    motor : Motor()
+        The motor in the vehicle.
+    slopes : np.ndarray
+        The slopes for the grading force (in %)
+    export_path : string, optional
+        If export, specify the path. The default is None.
+    i_dict : dict
+        The gear ratios to consider. Order is (peak, nominal).
+
+    Returns
+    -------
+    plt.fig
+        The plot!
+    """
+    
+    R_er = vehicle.tire_effective_radius_rear
+    k_oc = motor.overcharging_factor
+            
+    speed = np.linspace(1e-6, vehicle.max_speed, 1000) # km/h
+            
+    fig, ax = plt.subplots()
+    
+    powers = ["peak", "nom"]
+    
+    for p in powers:
+        
+        i = i_dict[p]
+        rpm = (speed * KMH_TO_MS) * (i/R_er) * RADS_TO_RPM # rpm
+        
+        F_t = vehicle.tractive_force(motor, rpm)
+    
+        if p == "nom":
+            F_t /= k_oc
+        
+        if p == "peak":
+            ax.set_ylim(0, np.max(np.abs(F_t)) * 1.1)
+        
+        color = "tab:pink" if p == "peak" else "royalblue"
+        p_string = "peak" if p == "peak" else "nominal"
+        ax.plot(speed, F_t, color=color, label= f"Tractive force ({p_string} power)")
+        
+        
+    
+    # Resistive forces plot
+    ls = {slopes[0]: "-", slopes[1]: "--", slopes[2]: ":"}
+    
+    for slope in slopes:
+        
+        F_res = total_force(vehicle, speed, slope)
+        
+        ax.plot(speed, F_res, color="black", ls=ls[slope],
+                label=f"Total road resistive force ({slope} % slope)")
+        
+        # Intersection
+        tol = 1e-2 * np.max(np.abs(F_t))
+        gap = np.abs(F_t - F_res)
+        k = np.argmin(gap)
+        
+        if gap[k] <= tol:
+            ax.scatter(speed[k], F_t[k], zorder=3, color="red",
+                       label = rf"$V_{{\mathsf{{lim}},\ {slope}\,\%\ \mathsf{{slope}}}}$ = {speed[k]:.1f} (km/h)")
+    
+    # Style
+    ax.set_xlabel(r"Speed (km/h)")
+    ax.set_ylabel(r"Force (N)")
+    ax.grid()
+    
+    # We want the axes to have the same size no matter the legend size so 
+    # this is required for a little trick after drawing the legend
+    w, h = fig.get_size_inches()
+    
+    fs = plt.rcParams["legend.fontsize"] - 2
+    fig.legend(loc="outside lower center", ncol=2, fontsize=fs)
+    fig.get_layout_engine().set(h_pad=0.2)
+    
+    # Now we apply the box aspect given by the style dict
+    ax.set_box_aspect(h / w)
+    
+    ax.set_xlim(0, vehicle.max_speed)
+    ticks = np.arange(0, vehicle.max_speed+1, 15)
+    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    
+    if export_path:
+        fig.savefig(export_path, dpi=300, bbox_inches="tight")
+    
+    return fig
+
+
+def plot_power_opti(vehicle, motor, slopes, i_dict, export_path=None):
+    """
+    Plots tractive power, resistive power against the speed and 
+    their possible intersections. 
+
+    Parameters
+    ----------
+    vehicle : Vehicle()
+        The vehicle to take into account.
+    motor : Motor()
+        The motor in the vehicle.
+    slopes : np.ndarray
+        The slopes for the grading force (in %)
+    export_path : string, optional
+        If export, specify the path. The default is None.
+    i_dict : dict
+        The gear ratios to consider. Order is (peak, nominal).
+
+    Returns
+    -------
+    plt.fig
+        The plot!
+    """
+    
+    R_er = vehicle.tire_effective_radius_rear
+    k_oc = motor.overcharging_factor
+    
+    speed = np.linspace(1e-6, vehicle.max_speed, 1000) # km/h
+    
+    fig, ax = plt.subplots()
+    
+    # Tractive power plot
+    
+    powers = ["peak", "nom"]
+    
+    for p in powers:
+        
+        i = i_dict[p]
+                    
+        rpm = (speed * KMH_TO_MS) * (i/R_er) * RADS_TO_RPM # rpm
+        
+        P_w = vehicle.tractive_power(motor, rpm) * 1e-3 # kW
+    
+        if p == "nom":
+            P_w /= k_oc
+                
+        # Tractive forces plot (ideal gear ratio)
+        color = "tab:pink" if p == "peak" else "royalblue"
+        p_string = "peak" if p == "peak" else "nominal"
+        ax.plot(speed, P_w, color=color, label= f"Tractive power ({p_string} power, optimal $i$)")
+        
+        
+        i = vehicle.gear_ratio
+        
+        rpm = (speed * KMH_TO_MS) * (i/R_er) * RADS_TO_RPM # rpm
+        
+        P_w = vehicle.tractive_power(motor, rpm) * 1e-3 # kW
+    
+        if p == "nom":
+            P_w /= k_oc
+                
+        # Tractive forces plot (actual gear ratio)
+        color = "tab:purple" if p == "peak" else "tab:cyan"
+        p_string = "peak" if p == "peak" else "nominal"
+        ax.plot(speed, P_w, color=color,
+                label= f"Tractive power ({p_string} power, actual $i$)",
+                alpha=0.3)
+    
+    
+    # Resistive forces plot
+    ls = {slopes[0]: "-", slopes[1]: "--", slopes[2]: ":"}
+    
+    for slope in slopes:
+        
+        P_res = total_power(vehicle, speed, slope) * 1e-3 # kW
+        
+        ax.plot(speed, P_res, color="black", ls=ls[slope],
+                label=f"Total road resistive power ({slope} % slope)")
+        
+        # Intersection (note: need to exclude speeds around 0 where there is an intersection)
+        tol = 1e-2 * np.max(np.abs(P_w))
+        v_tol = 10 # km/h
+        gap = np.abs(P_w - P_res)
+        
+        # mask = where the speed is above v_tol
+        mask = speed > v_tol
+        
+        # set artificially infinite gap where speed is under v_tol (~ = boolean inverse) 
+        # so that these speeds aren't taken into account in argmin 
+        gap[~mask] = np.inf
+        
+        k = np.argmin(gap)
+        
+        if gap[k] <= tol:
+            ax.scatter(speed[k], P_w[k], zorder=3, color="red",
+                       label = rf"$V_{{\mathsf{{lim}},\ {slope}\,\%\ \mathsf{{slope}}}}$ = {speed[k]:.1f} (km/h)")
+    
+    # Style
+    ax.set_xlabel(r"Speed (km/h)")
+    ax.set_ylabel(r"Power ($kW$)")
+    ax.grid()
+    
+    # We want the axes to have the same size no matter the legend size so 
+    # this is required for a little trick after drawing the legend
+    w, h = fig.get_size_inches()
+    
+    fs = plt.rcParams["legend.fontsize"] - 2
     fig.legend(loc="outside lower center", ncol=2, fontsize=fs)
     fig.get_layout_engine().set(h_pad=0.2)
     
